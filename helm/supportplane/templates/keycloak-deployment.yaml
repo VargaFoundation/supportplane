@@ -1,0 +1,69 @@
+{{- if .Values.keycloak.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supportplane.fullname" . }}-keycloak
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "supportplane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: keycloak
+  template:
+    metadata:
+      labels:
+        {{- include "supportplane.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          args:
+            - start-dev
+            - --import-realm
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://{{ include "supportplane.fullname" . }}-postgres:5432/{{ .Values.secrets.postgres.database }}
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: POSTGRES_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: KEYCLOAK_ADMIN_PASSWORD
+          livenessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+{{- end }}

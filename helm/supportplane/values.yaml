@@ -1,0 +1,88 @@
+backend:
+  image:
+    repository: supportplane/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  service:
+    port: 8081
+
+frontend:
+  image:
+    repository: supportplane/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  service:
+    port: 80
+
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "15"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  storage:
+    size: 10Gi
+    storageClassName: ""
+
+keycloak:
+  enabled: true
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: "24.0"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+secrets:
+  postgres:
+    database: supportplane
+    username: supportplane
+    password: supportplane
+  keycloak:
+    adminUsername: admin
+    adminPassword: admin
+
+bundleStorage:
+  size: 20Gi
+  storageClassName: ""
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: supportplane.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend: backend
+        - path: /
+          pathType: Prefix
+          backend: frontend
+  tls: []

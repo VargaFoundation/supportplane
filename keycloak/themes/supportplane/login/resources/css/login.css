@@ -1,0 +1,166 @@
+/* SupportPlane Custom Keycloak Login Theme */
+
+:root {
+  --sp-primary: #1e40af;
+  --sp-primary-hover: #1e3a8a;
+  --sp-primary-light: #dbeafe;
+  --sp-bg: #f8fafc;
+  --sp-card-bg: #ffffff;
+  --sp-text: #0f172a;
+  --sp-text-muted: #64748b;
+  --sp-border: #e2e8f0;
+  --sp-error: #dc2626;
+  --sp-error-bg: #fef2f2;
+  --sp-success: #16a34a;
+  --sp-radius: 0.5rem;
+}
+
+/* Page background */
+.login-pf body,
+body.login-pf {
+  background: var(--sp-bg) !important;
+}
+
+/* Hide default Keycloak header/branding */
+#kc-header-wrapper {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--sp-primary) !important;
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  padding: 2rem 0 0.5rem !important;
+}
+
+#kc-header {
+  background: transparent !important;
+  color: var(--sp-primary) !important;
+}
+
+/* Main card */
+#kc-form-wrapper,
+.card-pf {
+  background: var(--sp-card-bg) !important;
+  border: 1px solid var(--sp-border) !important;
+  border-radius: var(--sp-radius) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06) !important;
+  padding: 2rem !important;
+}
+
+#kc-content-wrapper {
+  max-width: 28rem;
+  margin: 0 auto;
+}
+
+/* Form labels */
+.login-pf .control-label,
+.login-pf label {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  color: var(--sp-text) !important;
+  margin-bottom: 0.25rem !important;
+}
+
+/* Form inputs */
+.login-pf .form-control,
+.login-pf input[type="text"],
+.login-pf input[type="password"],
+.login-pf input[type="email"] {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  border: 1px solid var(--sp-border) !important;
+  border-radius: var(--sp-radius) !important;
+  padding: 0.5rem 0.75rem !important;
+  font-size: 0.875rem !important;
+  color: var(--sp-text) !important;
+  background: var(--sp-card-bg) !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+  height: auto !important;
+}
+
+.login-pf .form-control:focus,
+.login-pf input:focus {
+  border-color: var(--sp-primary) !important;
+  box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.2) !important;
+  outline: none !important;
+}
+
+/* Primary button */
+.login-pf .btn-primary,
+.login-pf input[type="submit"].btn-primary {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--sp-primary) !important;
+  border-color: var(--sp-primary) !important;
+  border-radius: var(--sp-radius) !important;
+  font-size: 0.875rem !important;
+  font-weight: 500 !important;
+  padding: 0.5rem 1rem !important;
+  color: #fff !important;
+  transition: background-color 0.15s !important;
+  width: 100% !important;
+}
+
+.login-pf .btn-primary:hover,
+.login-pf .btn-primary:focus {
+  background-color: var(--sp-primary-hover) !important;
+  border-color: var(--sp-primary-hover) !important;
+}
+
+/* Links */
+.login-pf a,
+.login-pf .login-pf-settings a {
+  color: var(--sp-primary) !important;
+  text-decoration: none !important;
+  font-size: 0.875rem !important;
+}
+
+.login-pf a:hover {
+  text-decoration: underline !important;
+}
+
+/* Error alerts */
+.login-pf .alert-error,
+.login-pf .kc-feedback-text {
+  background: var(--sp-error-bg) !important;
+  color: var(--sp-error) !important;
+  border: 1px solid #fecaca !important;
+  border-radius: var(--sp-radius) !important;
+  padding: 0.75rem !important;
+  font-size: 0.875rem !important;
+}
+
+/* Remember me checkbox */
+.login-pf .checkbox label,
+.login-pf #rememberMe label {
+  font-size: 0.875rem !important;
+  color: var(--sp-text-muted) !important;
+}
+
+/* Footer text */
+#kc-registration,
+#kc-info-wrapper {
+  font-size: 0.875rem !important;
+  color: var(--sp-text-muted) !important;
+  text-align: center !important;
+  margin-top: 1rem !important;
+}
+
+/* Hide unnecessary elements */
+.login-pf .kc-logo-text,
+.login-pf #kc-locale {
+  display: none !important;
+}
+
+/* Subtitle under header */
+#kc-header-wrapper::after {
+  content: "Cluster Management Platform";
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 400;
+  color: var(--sp-text-muted);
+  margin-top: 0.25rem;
+}
+
+/* Form group spacing */
+.login-pf .form-group {
+  margin-bottom: 1rem !important;
+}

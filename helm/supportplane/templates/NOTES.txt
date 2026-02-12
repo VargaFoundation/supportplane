@@ -1,0 +1,20 @@
+SupportPlane has been deployed.
+
+{{- if .Values.ingress.enabled }}
+Access the application at:
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+Get the frontend URL by running:
+  export POD_NAME=$(kubectl get pods -l "app.kubernetes.io/name={{ include "supportplane.name" . }},app.kubernetes.io/component=frontend" -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward $POD_NAME 3000:80
+
+Get the backend URL by running:
+  export POD_NAME=$(kubectl get pods -l "app.kubernetes.io/name={{ include "supportplane.name" . }},app.kubernetes.io/component=backend" -o jsonpath="{.items[0].metadata.name}")
+  kubectl port-forward $POD_NAME 8081:8081
+{{- end }}
+
+Default credentials:
+  Keycloak Admin: {{ .Values.secrets.keycloak.adminUsername }} / {{ .Values.secrets.keycloak.adminPassword }}
+  Database: {{ .Values.secrets.postgres.username }} / {{ .Values.secrets.postgres.password }}

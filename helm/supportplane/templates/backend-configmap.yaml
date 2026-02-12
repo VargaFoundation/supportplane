@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supportplane.fullname" . }}-backend-config
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://{{ include "supportplane.fullname" . }}-postgres:5432/{{ .Values.secrets.postgres.database }}
+  KEYCLOAK_AUTH_SERVER_URL: http://{{ include "supportplane.fullname" . }}-keycloak:8080
+  KEYCLOAK_CLIENTS_REALM: clients
+  KEYCLOAK_SUPPORT_REALM: support
+  SERVER_PORT: "8081"

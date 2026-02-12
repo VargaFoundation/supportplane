@@ -1,0 +1,50 @@
+server:
+  port: 8081
+  servlet:
+    context-path: /
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/supportplane
+    username: supportplane
+    password: supportplane
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 500MB
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}/realms/${KEYCLOAK_CLIENTS_REALM:clients}
+
+keycloak:
+  auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}
+  clients-realm: ${KEYCLOAK_CLIENTS_REALM:clients}
+  support-realm: ${KEYCLOAK_SUPPORT_REALM:support}
+  admin-client-id: admin-cli
+  admin-username: admin
+  admin-password: admin
+
+app:
+  bundle-storage-path: /var/lib/supportplane/bundles
+  otp-expiry-minutes: 10
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:5173
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html

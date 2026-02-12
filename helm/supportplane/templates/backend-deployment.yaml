@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "supportplane.fullname" . }}-backend
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  replicas: {{ .Values.backend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "supportplane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      labels:
+        {{- include "supportplane.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      containers:
+        - name: backend
+          image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: 8081
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "supportplane.fullname" . }}-backend-config
+          env:
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: POSTGRES_USER
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.fullname" . }}-secrets
+                  key: POSTGRES_PASSWORD
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 60
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+          volumeMounts:
+            - name: bundle-storage
+              mountPath: /var/lib/supportplane/bundles
+      volumes:
+        - name: bundle-storage
+          persistentVolumeClaim:
+            claimName: {{ include "supportplane.fullname" . }}-bundles

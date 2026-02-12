@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "supportplane.fullname" . }}-bundles
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.bundleStorage.storageClassName }}
+  storageClassName: {{ .Values.bundleStorage.storageClassName }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.bundleStorage.size }}

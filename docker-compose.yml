@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: supportplane
+      POSTGRES_USER: supportplane
+      POSTGRES_PASSWORD: supportplane
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U supportplane"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: start-dev --import-realm
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/supportplane
+      KC_DB_USERNAME: supportplane
+      KC_DB_PASSWORD: supportplane
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak/realm-clients.json:/opt/keycloak/data/import/realm-clients.json
+      - ./keycloak/realm-support.json:/opt/keycloak/data/import/realm-support.json
+      - ./keycloak/themes/supportplane:/opt/keycloak/themes/supportplane
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  backend:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/supportplane
+      SPRING_DATASOURCE_USERNAME: supportplane
+      SPRING_DATASOURCE_PASSWORD: supportplane
+      KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
+      KEYCLOAK_CLIENTS_REALM: clients
+      KEYCLOAK_SUPPORT_REALM: support
+    ports:
+      - "8081:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  pgdata:
