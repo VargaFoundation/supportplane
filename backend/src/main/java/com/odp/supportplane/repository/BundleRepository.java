@@ -9,4 +9,5 @@ public interface BundleRepository extends JpaRepository<Bundle, Long> {
     List<Bundle> findByClusterIdOrderByReceivedAtDesc(Long clusterId);
     Optional<Bundle> findByBundleId(String bundleId);
     boolean existsByBundleId(String bundleId);
+    void deleteByClusterId(Long clusterId);
 }

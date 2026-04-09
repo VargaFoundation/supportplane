@@ -2,13 +2,15 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
-import { Plus, Server, Trash2 } from 'lucide-react'
+import { Plus, Server, Trash2, Unplug, Copy, Check } from 'lucide-react'
 
 export default function ClustersPage() {
   const [showAttach, setShowAttach] = useState(false)
   const [clusterId, setClusterId] = useState('')
   const [clusterName, setClusterName] = useState('')
   const [otpResult, setOtpResult] = useState<{ otpCode: string } | null>(null)
+  const [confirmDelete, setConfirmDelete] = useState<number | null>(null)
+  const [copiedId, setCopiedId] = useState<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: clusters, isLoading } = useQuery({
@@ -26,13 +28,27 @@ export default function ClustersPage() {
   })
 
   const detachMutation = useMutation({
-    mutationFn: (id: number) => api.delete(`/clusters/${id}`),
+    mutationFn: (id: number) => api.post(`/clusters/${id}/detach`),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['clusters'] }),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: number) => api.delete(`/clusters/${id}`),
+    onSuccess: () => {
+      setConfirmDelete(null)
+      queryClient.invalidateQueries({ queryKey: ['clusters'] })
+    },
   })
 
   const handleAttach = (e: React.FormEvent) => {
     e.preventDefault()
     attachMutation.mutate({ clusterId, name: clusterName })
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopiedId(text)
+    setTimeout(() => setCopiedId(null), 2000)
   }
 
   const statusColor: Record<string, string> = {
@@ -96,23 +112,71 @@ export default function ClustersPage() {
       ) : (
         <div className="grid gap-4">
           {clusters?.map((cluster: any) => (
-            <div key={cluster.id} className="bg-white border rounded-lg p-5 flex items-center justify-between">
-              <Link to={`/clusters/${cluster.id}`} className="flex items-center gap-4 flex-1">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Server className="w-5 h-5 text-primary" />
+            <div key={cluster.id} className="bg-white border rounded-lg p-5">
+              <div className="flex items-center justify-between">
+                <Link to={`/clusters/${cluster.id}`} className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                    <Server className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-medium">{cluster.name || cluster.clusterId}</h3>
+                    <div className="flex items-center gap-2 mt-1">
+                      <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700">
+                        {cluster.clusterId}
+                      </code>
+                      <button
+                        onClick={(e) => { e.preventDefault(); copyToClipboard(cluster.clusterId) }}
+                        className="p-0.5 text-gray-400 hover:text-gray-600"
+                        title="Copy Cluster ID"
+                      >
+                        {copiedId === cluster.clusterId ? (
+                          <Check className="w-3.5 h-3.5 text-green-600" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 text-xs rounded-full shrink-0 ${statusColor[cluster.status] || 'bg-gray-100'}`}>
+                    {cluster.status}
+                  </span>
+                </Link>
+                <div className="flex items-center gap-1 ml-4 shrink-0">
+                  {cluster.status !== 'DETACHED' && (
+                    <button
+                      onClick={() => detachMutation.mutate(cluster.id)}
+                      className="p-2 text-muted-foreground hover:text-yellow-600"
+                      title="Detach cluster"
+                    >
+                      <Unplug className="w-4 h-4" />
+                    </button>
+                  )}
+                  {confirmDelete === cluster.id ? (
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => deleteMutation.mutate(cluster.id)}
+                        className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => setConfirmDelete(null)}
+                        className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmDelete(cluster.id)}
+                      className="p-2 text-muted-foreground hover:text-destructive"
+                      title="Delete cluster permanently"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-medium">{cluster.name || cluster.clusterId}</h3>
-                  <p className="text-sm text-muted-foreground font-mono">{cluster.clusterId}</p>
-                </div>
-                <span className={`px-2 py-1 text-xs rounded-full ${statusColor[cluster.status] || 'bg-gray-100'}`}>
-                  {cluster.status}
-                </span>
-              </Link>
-              <button onClick={() => detachMutation.mutate(cluster.id)}
-                className="p-2 text-muted-foreground hover:text-destructive">
-                <Trash2 className="w-4 h-4" />
-              </button>
+              </div>
             </div>
           ))}
           {clusters?.length === 0 && (

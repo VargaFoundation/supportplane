@@ -53,10 +53,16 @@ public class ClusterController {
         return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired OTP"));
     }
 
-    @DeleteMapping("/{id}")
+    @PostMapping("/{id}/detach")
     public ResponseEntity<?> detachCluster(@PathVariable Long id) {
         clusterService.detach(id);
         return ResponseEntity.ok(Map.of("status", "detached"));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteCluster(@PathVariable Long id) {
+        clusterService.delete(id);
+        return ResponseEntity.ok(Map.of("status", "deleted"));
     }
 
     @GetMapping("/{id}")

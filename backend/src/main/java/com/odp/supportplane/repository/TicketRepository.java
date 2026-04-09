@@ -10,4 +10,5 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findByStatus(String status);
     List<Ticket> findByAssignedToId(Long userId);
     long countByTenantIdAndStatus(Long tenantId, String status);
+    void deleteByClusterId(Long clusterId);
 }

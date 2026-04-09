@@ -4,9 +4,13 @@ import com.odp.supportplane.config.TenantContext;
 import com.odp.supportplane.model.Cluster;
 import com.odp.supportplane.model.ClusterOtp;
 import com.odp.supportplane.model.Tenant;
+import com.odp.supportplane.repository.BundleRepository;
 import com.odp.supportplane.repository.ClusterOtpRepository;
 import com.odp.supportplane.repository.ClusterRepository;
+import com.odp.supportplane.repository.RecommendationRepository;
 import com.odp.supportplane.repository.TenantRepository;
+import com.odp.supportplane.repository.TicketCommentRepository;
+import com.odp.supportplane.repository.TicketRepository;
 import com.odp.supportplane.security.OTPGenerator;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -24,6 +28,10 @@ public class ClusterService {
     private final ClusterRepository clusterRepository;
     private final ClusterOtpRepository clusterOtpRepository;
     private final TenantRepository tenantRepository;
+    private final BundleRepository bundleRepository;
+    private final RecommendationRepository recommendationRepository;
+    private final TicketRepository ticketRepository;
+    private final TicketCommentRepository ticketCommentRepository;
 
     @Value("${app.otp-expiry-minutes:10}")
     private int otpExpiryMinutes;
@@ -101,6 +109,23 @@ public class ClusterService {
             cluster.setStatus("DETACHED");
             clusterRepository.save(cluster);
         });
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        Cluster cluster = clusterRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cluster not found: " + id));
+
+        // Delete related records in correct order (FK constraints)
+        List<com.odp.supportplane.model.Ticket> tickets = ticketRepository.findByClusterIdOrderByCreatedAtDesc(cluster.getId());
+        for (com.odp.supportplane.model.Ticket ticket : tickets) {
+            ticketCommentRepository.deleteByTicketId(ticket.getId());
+        }
+        ticketRepository.deleteByClusterId(cluster.getId());
+        recommendationRepository.deleteByClusterId(cluster.getId());
+        bundleRepository.deleteByClusterId(cluster.getId());
+        clusterOtpRepository.deleteByClusterId(cluster.getId());
+        clusterRepository.delete(cluster);
     }
 
     private Tenant getCurrentTenant() {

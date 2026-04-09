@@ -7,4 +7,5 @@ import java.util.Optional;
 public interface ClusterOtpRepository extends JpaRepository<ClusterOtp, Long> {
     Optional<ClusterOtp> findByClusterIdAndOtpCodeAndUsedFalse(Long clusterId, String otpCode);
     Optional<ClusterOtp> findTopByClusterIdAndUsedFalseOrderByCreatedAtDesc(Long clusterId);
+    void deleteByClusterId(Long clusterId);
 }

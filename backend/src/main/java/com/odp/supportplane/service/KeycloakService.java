@@ -90,12 +90,42 @@ public class KeycloakService {
         if (response.getStatusCode() == HttpStatus.CREATED) {
             String location = response.getHeaders().getFirst("Location");
             if (location != null) {
-                return location.substring(location.lastIndexOf('/') + 1);
+                String userId = location.substring(location.lastIndexOf('/') + 1);
+                assignRealmRoles(realm, userId, roles, adminToken);
+                return userId;
             }
         }
 
         log.warn("Keycloak user creation returned status: {}", response.getStatusCode());
         return null;
+    }
+
+    private void assignRealmRoles(String realm, String userId, List<String> roles, String adminToken) {
+        try {
+            String rolesUrl = authServerUrl + "/admin/realms/" + realm + "/roles";
+            String assignUrl = authServerUrl + "/admin/realms/" + realm + "/users/" + userId + "/role-mappings/realm";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.setBearerAuth(adminToken);
+
+            List<Map<String, Object>> roleRepresentations = new java.util.ArrayList<>();
+            for (String roleName : roles) {
+                ResponseEntity<Map> roleResponse = restTemplate.exchange(
+                        rolesUrl + "/" + roleName, HttpMethod.GET,
+                        new HttpEntity<>(headers), Map.class);
+                if (roleResponse.getStatusCode().is2xxSuccessful() && roleResponse.getBody() != null) {
+                    roleRepresentations.add(roleResponse.getBody());
+                }
+            }
+
+            if (!roleRepresentations.isEmpty()) {
+                restTemplate.postForEntity(assignUrl,
+                        new HttpEntity<>(roleRepresentations, headers), Void.class);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to assign realm roles to user {}: {}", userId, e.getMessage());
+        }
     }
 
     public Map<String, Object> login(String realm, String username, String password) {

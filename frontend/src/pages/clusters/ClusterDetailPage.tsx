@@ -2,7 +2,8 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Server, Package, FileText } from 'lucide-react'
+import { Server, Package, FileText, Copy, Check } from 'lucide-react'
+import { useState } from 'react'
 
 export default function ClusterDetailPage() {
   const { id } = useParams()
@@ -22,6 +23,15 @@ export default function ClusterDetailPage() {
     queryFn: () => api.get(`/clusters/${id}/recommendations`).then((r) => r.data),
   })
 
+  const [copied, setCopied] = useState(false)
+  const copyClusterId = () => {
+    if (cluster) {
+      navigator.clipboard.writeText(cluster.clusterId)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }
+
   if (!cluster) return <div className="text-muted-foreground">Loading...</div>
 
   const statusColor: Record<string, string> = {
@@ -38,7 +48,14 @@ export default function ClusterDetailPage() {
         </div>
         <div>
           <h1 className="text-2xl font-bold">{cluster.name || cluster.clusterId}</h1>
-          <p className="text-sm text-muted-foreground font-mono">{cluster.clusterId}</p>
+          <div className="flex items-center gap-2 mt-1">
+            <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700">
+              {cluster.clusterId}
+            </code>
+            <button onClick={copyClusterId} className="p-0.5 text-gray-400 hover:text-gray-600" title="Copy Cluster ID">
+              {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
         <span className={`px-3 py-1 text-sm rounded-full ${statusColor[cluster.status] || 'bg-gray-100'}`}>
           {cluster.status}
