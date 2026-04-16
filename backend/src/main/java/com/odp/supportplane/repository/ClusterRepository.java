@@ -9,4 +9,5 @@ public interface ClusterRepository extends JpaRepository<Cluster, Long> {
     List<Cluster> findByTenantId(Long tenantId);
     Optional<Cluster> findByClusterId(String clusterId);
     List<Cluster> findByStatus(String status);
+    long countByTenantId(Long tenantId);
 }

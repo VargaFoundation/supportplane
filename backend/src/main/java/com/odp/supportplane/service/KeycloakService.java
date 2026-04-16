@@ -128,6 +128,39 @@ public class KeycloakService {
         }
     }
 
+    public void disableUser(String realm, String keycloakId) {
+        String adminToken = getAdminToken();
+        String url = authServerUrl + "/admin/realms/" + realm + "/users/" + keycloakId;
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(adminToken);
+
+        Map<String, Object> body = Map.of("enabled", false);
+        restTemplate.exchange(url, HttpMethod.PUT, new HttpEntity<>(body, headers), Void.class);
+        log.info("Disabled Keycloak user {} in realm {}", keycloakId, realm);
+    }
+
+    public Map<String, Object> refreshToken(String realm, String refreshToken) {
+        String url = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
+
+        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "refresh_token");
+        form.add("client_id", "supportplane-frontend");
+        form.add("refresh_token", refreshToken);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        ResponseEntity<Map> response = restTemplate.postForEntity(url,
+                new HttpEntity<>(form, headers), Map.class);
+
+        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+            return response.getBody();
+        }
+        throw new RuntimeException("Token refresh failed");
+    }
+
     public Map<String, Object> login(String realm, String username, String password) {
         String url = authServerUrl + "/realms/" + realm + "/protocol/openid-connect/token";
 

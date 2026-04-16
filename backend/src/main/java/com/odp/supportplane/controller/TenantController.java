@@ -1,5 +1,6 @@
 package com.odp.supportplane.controller;
 
+import com.odp.supportplane.dto.request.UpdateTenantRequest;
 import com.odp.supportplane.dto.response.TenantResponse;
 import com.odp.supportplane.service.TenantService;
 import lombok.RequiredArgsConstructor;
@@ -17,16 +18,20 @@ public class TenantController {
 
     @GetMapping
     public ResponseEntity<List<TenantResponse>> listTenants() {
-        List<TenantResponse> tenants = tenantService.findAll().stream()
-                .map(TenantResponse::from)
-                .toList();
-        return ResponseEntity.ok(tenants);
+        return ResponseEntity.ok(tenantService.findAllWithCounts());
     }
 
     @GetMapping("/{tenantId}")
     public ResponseEntity<TenantResponse> getTenant(@PathVariable String tenantId) {
         return tenantService.findByTenantId(tenantId)
-                .map(t -> ResponseEntity.ok(TenantResponse.from(t)))
+                .map(t -> ResponseEntity.ok(tenantService.buildResponse(t)))
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{tenantId}")
+    public ResponseEntity<TenantResponse> updateTenant(@PathVariable String tenantId,
+                                                        @RequestBody UpdateTenantRequest request) {
+        var tenant = tenantService.update(tenantId, request);
+        return ResponseEntity.ok(tenantService.buildResponse(tenant));
     }
 }

@@ -18,6 +18,15 @@ public class RecommendationController {
 
     private final RecommendationService recommendationService;
 
+    @GetMapping("/recommendations")
+    public ResponseEntity<List<RecommendationResponse>> listAllRecommendations(
+            @RequestParam(required = false) String status) {
+        List<RecommendationResponse> recs = recommendationService.getAll(status).stream()
+                .map(RecommendationResponse::from)
+                .toList();
+        return ResponseEntity.ok(recs);
+    }
+
     @GetMapping("/clusters/{clusterId}/recommendations")
     public ResponseEntity<List<RecommendationResponse>> getRecommendations(
             @PathVariable Long clusterId) {

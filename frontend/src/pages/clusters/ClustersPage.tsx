@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { Plus, Server, Trash2, Unplug, Copy, Check } from 'lucide-react'
+import { Button, Card, StatusBadge, PageLoader, EmptyState } from '@/components/ui'
 
 export default function ClustersPage() {
   const [showAttach, setShowAttach] = useState(false)
@@ -51,139 +52,117 @@ export default function ClustersPage() {
     setTimeout(() => setCopiedId(null), 2000)
   }
 
-  const statusColor: Record<string, string> = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    DETACHED: 'bg-gray-100 text-gray-800',
-  }
-
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Clusters</h1>
-        <button onClick={() => { setShowAttach(true); setOtpResult(null) }}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90">
+        <h1 className="text-2xl font-semibold tracking-tight">Clusters</h1>
+        <Button onClick={() => { setShowAttach(true); setOtpResult(null) }}>
           <Plus className="w-4 h-4" /> Attach Cluster
-        </button>
+        </Button>
       </div>
 
       {showAttach && (
-        <div className="bg-white border rounded-lg p-6 mb-6">
+        <Card className="p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Attach a Cluster</h2>
           {!otpResult ? (
             <form onSubmit={handleAttach} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Cluster ID (from ODPSC mpack)</label>
+                <label className="block text-sm font-medium mb-1.5">Cluster ID <span className="text-muted-foreground font-normal">(from ODPSC mpack)</span></label>
                 <input type="text" value={clusterId} onChange={(e) => setClusterId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm" required />
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" required />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Display Name</label>
+                <label className="block text-sm font-medium mb-1.5">Display Name</label>
                 <input type="text" value={clusterName} onChange={(e) => setClusterName(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm" />
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
+                  placeholder="Optional friendly name" />
               </div>
               <div className="flex gap-2">
-                <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">
-                  Generate OTP
-                </button>
-                <button type="button" onClick={() => setShowAttach(false)}
-                  className="px-4 py-2 border rounded-md text-sm">Cancel</button>
+                <Button type="submit" loading={attachMutation.isPending}>Generate OTP</Button>
+                <Button variant="secondary" type="button" onClick={() => setShowAttach(false)}>Cancel</Button>
               </div>
             </form>
           ) : (
             <div className="space-y-3">
-              <div className="bg-green-50 border border-green-200 p-4 rounded-md">
-                <p className="text-sm font-medium text-green-800">OTP Generated Successfully</p>
-                <p className="text-3xl font-mono font-bold text-green-900 mt-2">{otpResult.otpCode}</p>
-                <p className="text-sm text-green-700 mt-2">
-                  Enter this OTP in Ambari: ODPSC Service &gt; Configs &gt; attachment_otp
+              <div className="bg-emerald-50 border border-emerald-200 p-5 rounded-lg">
+                <p className="text-sm font-medium text-emerald-800">OTP Generated Successfully</p>
+                <p className="text-3xl font-mono font-bold text-emerald-900 mt-2 tracking-wider">{otpResult.otpCode}</p>
+                <p className="text-sm text-emerald-700 mt-3">
+                  Enter this OTP in Ambari: <strong>ODPSC Service &gt; Configs &gt; attachment_otp</strong>
                 </p>
-                <p className="text-xs text-green-600 mt-1">This OTP expires in 10 minutes.</p>
+                <p className="text-xs text-emerald-600 mt-1">This OTP expires in 10 minutes.</p>
               </div>
-              <button onClick={() => { setShowAttach(false); setOtpResult(null) }}
-                className="px-4 py-2 border rounded-md text-sm">Close</button>
+              <Button variant="secondary" onClick={() => { setShowAttach(false); setOtpResult(null) }}>Close</Button>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading clusters...</div>
+        <PageLoader message="Loading clusters..." />
+      ) : clusters?.length === 0 ? (
+        <EmptyState icon={Server} title="No clusters attached"
+          description="Attach your first cluster by clicking the button above."
+          action={<Button onClick={() => { setShowAttach(true); setOtpResult(null) }}><Plus className="w-4 h-4" /> Attach Cluster</Button>}
+        />
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3">
           {clusters?.map((cluster: any) => (
-            <div key={cluster.id} className="bg-white border rounded-lg p-5">
+            <Card key={cluster.id} hover className="p-4">
               <div className="flex items-center justify-between">
                 <Link to={`/clusters/${cluster.id}`} className="flex items-center gap-4 flex-1 min-w-0">
-                  <div className="p-2 bg-primary/10 rounded-lg shrink-0">
+                  <div className="p-2 bg-primary/8 rounded-lg shrink-0">
                     <Server className="w-5 h-5 text-primary" />
                   </div>
                   <div className="min-w-0">
-                    <h3 className="font-medium">{cluster.name || cluster.clusterId}</h3>
+                    <h3 className="font-medium text-sm">{cluster.name || cluster.clusterId}</h3>
                     <div className="flex items-center gap-2 mt-1">
-                      <code className="text-sm bg-gray-100 px-2 py-0.5 rounded font-mono text-gray-700">
+                      <code className="text-xs bg-gray-100 px-1.5 py-0.5 rounded font-mono text-gray-600 truncate max-w-[200px]">
                         {cluster.clusterId}
                       </code>
                       <button
                         onClick={(e) => { e.preventDefault(); copyToClipboard(cluster.clusterId) }}
-                        className="p-0.5 text-gray-400 hover:text-gray-600"
-                        title="Copy Cluster ID"
+                        className="p-0.5 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Copy Cluster ID" aria-label="Copy Cluster ID"
                       >
                         {copiedId === cluster.clusterId ? (
-                          <Check className="w-3.5 h-3.5 text-green-600" />
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" />
                         )}
                       </button>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 text-xs rounded-full shrink-0 ${statusColor[cluster.status] || 'bg-gray-100'}`}>
-                    {cluster.status}
-                  </span>
+                  <StatusBadge value={cluster.status} />
                 </Link>
                 <div className="flex items-center gap-1 ml-4 shrink-0">
                   {cluster.status !== 'DETACHED' && (
                     <button
                       onClick={() => detachMutation.mutate(cluster.id)}
-                      className="p-2 text-muted-foreground hover:text-yellow-600"
-                      title="Detach cluster"
+                      className="p-2 text-muted-foreground hover:text-amber-600 transition-colors rounded-md hover:bg-amber-50"
+                      title="Detach cluster" aria-label="Detach cluster"
                     >
                       <Unplug className="w-4 h-4" />
                     </button>
                   )}
                   {confirmDelete === cluster.id ? (
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => deleteMutation.mutate(cluster.id)}
-                        className="px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-                      >
-                        Confirm
-                      </button>
-                      <button
-                        onClick={() => setConfirmDelete(null)}
-                        className="px-2 py-1 text-xs border rounded hover:bg-gray-50"
-                      >
-                        Cancel
-                      </button>
+                      <Button size="sm" variant="destructive" onClick={() => deleteMutation.mutate(cluster.id)}>Confirm</Button>
+                      <Button size="sm" variant="secondary" onClick={() => setConfirmDelete(null)}>Cancel</Button>
                     </div>
                   ) : (
                     <button
                       onClick={() => setConfirmDelete(cluster.id)}
-                      className="p-2 text-muted-foreground hover:text-destructive"
-                      title="Delete cluster permanently"
+                      className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-md hover:bg-red-50"
+                      title="Delete cluster permanently" aria-label="Delete cluster"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
                   )}
                 </div>
               </div>
-            </div>
+            </Card>
           ))}
-          {clusters?.length === 0 && (
-            <div className="text-center py-12 text-muted-foreground">
-              No clusters attached yet. Click "Attach Cluster" to get started.
-            </div>
-          )}
         </div>
       )}
     </div>

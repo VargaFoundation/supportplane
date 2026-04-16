@@ -1,8 +1,8 @@
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Server, Package, FileText, Copy, Check } from 'lucide-react'
+import { Server, Package, FileText, Copy, Check, Shield, ClipboardList } from 'lucide-react'
 import { useState } from 'react'
 
 export default function ClusterDetailPage() {
@@ -60,6 +60,16 @@ export default function ClusterDetailPage() {
         <span className={`px-3 py-1 text-sm rounded-full ${statusColor[cluster.status] || 'bg-gray-100'}`}>
           {cluster.status}
         </span>
+        <div className="ml-auto flex items-center gap-2">
+          <Link to={`/clusters/${id}/audit`}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50">
+            <Shield className="w-4 h-4" /> Architecture & Audit
+          </Link>
+          <Link to={`/clusters/${id}/audit-report`}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50">
+            <ClipboardList className="w-4 h-4" /> Audit Report
+          </Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -97,17 +107,34 @@ export default function ClusterDetailPage() {
             {recommendations?.map((r: any) => (
               <div key={r.id} className="border rounded-md p-3">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-medium">{r.title}</h3>
-                  <span className={`px-2 py-0.5 text-xs rounded-full ${
-                    r.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
-                    r.severity === 'WARNING' ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-blue-100 text-blue-800'
-                  }`}>{r.severity}</span>
+                  <div className="flex items-center gap-2">
+                    {r.findingStatus && r.findingStatus !== 'UNKNOWN' && (
+                      <span className={`w-2 h-2 rounded-full ${
+                        r.findingStatus === 'OK' ? 'bg-green-500' :
+                        r.findingStatus === 'WARNING' ? 'bg-yellow-500' :
+                        r.findingStatus === 'CRITICAL' ? 'bg-red-500' : 'bg-gray-400'
+                      }`} />
+                    )}
+                    <h3 className="text-sm font-medium">{r.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {r.component && (
+                      <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">{r.component}</span>
+                    )}
+                    <span className={`px-2 py-0.5 text-xs rounded-full ${
+                      r.severity === 'CRITICAL' ? 'bg-red-100 text-red-800' :
+                      r.severity === 'WARNING' ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>{r.severity}</span>
+                  </div>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">{r.description}</p>
                 <div className="flex items-center gap-2 mt-2">
                   <span className="text-xs px-2 py-0.5 bg-gray-100 rounded">{r.status}</span>
                   <span className="text-xs text-muted-foreground">{r.source}</span>
+                  {r.category && (
+                    <span className="text-xs text-muted-foreground">{r.category}</span>
+                  )}
                 </div>
               </div>
             ))}

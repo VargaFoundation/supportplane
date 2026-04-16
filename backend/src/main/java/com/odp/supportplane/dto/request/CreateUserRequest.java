@@ -16,4 +16,7 @@ public class CreateUserRequest {
     private String password;
 
     private String role;
+
+    // Optional: operator can specify target tenant (slug)
+    private String tenantId;
 }

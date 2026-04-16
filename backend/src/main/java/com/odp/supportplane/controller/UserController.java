@@ -37,8 +37,15 @@ public class UserController {
     public ResponseEntity<UserResponse> createUser(@Valid @RequestBody CreateUserRequest request) {
         var user = userService.create(
                 request.getEmail(), request.getFullName(),
-                request.getPassword(), request.getRole());
+                request.getPassword(), request.getRole(),
+                request.getTenantId());
         return ResponseEntity.ok(UserResponse.from(user));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long id) {
+        userService.delete(id);
+        return ResponseEntity.ok(Map.of("status", "deleted"));
     }
 
     @PutMapping("/{id}")

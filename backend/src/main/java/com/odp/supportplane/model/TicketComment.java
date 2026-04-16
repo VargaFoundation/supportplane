@@ -24,6 +24,15 @@ public class TicketComment {
     @Column(nullable = false)
     private String content;
 
+    @Column(name = "attachment_filename")
+    private String attachmentFilename;
+
+    @Column(name = "attachment_filepath")
+    private String attachmentFilepath;
+
+    @Column(name = "attachment_size")
+    private Long attachmentSize;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

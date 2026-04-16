@@ -26,6 +26,8 @@ public class BundleService {
 
     private final BundleRepository bundleRepository;
     private final ClusterRepository clusterRepository;
+    private final BundleParsingService bundleParsingService;
+    private final NotificationDispatcher notificationDispatcher;
 
     @Value("${app.bundle-storage-path:/var/lib/supportplane/bundles}")
     private String storagePath;
@@ -62,13 +64,22 @@ public class BundleService {
                 .build();
         bundle = bundleRepository.save(bundle);
 
-        // Update cluster last bundle timestamp
+        // Update cluster last bundle timestamp + notify
         if (cluster != null) {
             cluster.setLastBundleAt(LocalDateTime.now());
             clusterRepository.save(cluster);
+            if (cluster.getTenant() != null) {
+                notificationDispatcher.dispatch(cluster.getTenant(), "BUNDLE_RECEIVED",
+                        "Bundle received for " + cluster.getName(),
+                        "Bundle: " + bundleId + " (" + file.getSize() + " bytes)");
+            }
         }
 
         log.info("Bundle received: {} (cluster: {}, size: {} bytes)", bundleId, clusterId, file.getSize());
+
+        // Parse bundle contents to extract metadata
+        bundleParsingService.parseBundle(bundle);
+
         return bundle;
     }
 

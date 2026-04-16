@@ -1,0 +1,1299 @@
+= Performances and security report
+Vincent Devillers <https://twitter.com/treydone[@Treydone]>;
+:toc: left
+:toclevels: 4
+:revnumber: 1.0
+:revdate: 2018-06-15
+:revremark: Pre-final version
+:version-label!:
+:sectnums:
+:icons: font
+
+[NOTE]
+.This document is under active writing
+
+====
+Version: {revnumber}
+
+Version Date: {revdate}
+
+Version Notes: {revremark}
+====
+
+== About this document
+
+There is absolutely no question that Hadoop is a fundamentally disruptive technology. New
+advancements — in scalability, performance, and data processing capabilities — have been hitting
+us every few months over the last 4 years. But as
+Hadoop becomes the new normal IT teams, developers, and security practitioners are playing
+catch-up to understand Hadoop security and use efficently the computational resources available.
+This document lays out a series of recommended security and performance controls for Hadoop.
+
+=== Context
+
+This report is based on the Hadoop cluster of the EY Lab team.
+The actual cluster is composed of 6 hosts:
+
+- 1 edge node
+- 1 master node
+- 4 data node
+
+=== Scope of the report
+
+The report covered the following:
+
+- Hardware, network, security design survey and analysis
+- Review current and future Hadoop requirements
+- Review the Hadoop architecture, ingestion pipeline, data schema, and data partitioning system
+- Review any data processing jobs or analytics processes
+- Review the data-serving and results-publishing systems
+- Run standard and possibly specialized performance tests
+- Recommend performance tuning, data compression and decompression, and scheduler configuration
+- Review management and monitoring processes and production procedures
+
+=== Approach and methodology
+
+A set of tools and program are executed on the cluster in order to gather informations about the hosts and the components.
+These informations are then collected, processed and reviewed, either by automatic procedures or directly by an expert.
+
+=== Explanations
+
+
+Each control is identify by a flag, one or more threats, one or more vulnerabilities, one or more assets, potential impacts, a likelihood, a risk level and some recommendations.
+
+A threat refers to a new or newly discovered incident with the potential to do harm to a system or your overall organization.
+A vulnerability refers to a known weakness of an asset (resource) that can be exploited.
+Recommandations refers to advisories, solutions, and tools.
+Risk translates to the following:
+
+`risk = likelihood x impact`
+
+Example:
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Sensitive data leakage (Man in the middle)
+
+.Vulnerability
+- Lack of access control policy
+
+.Asset
+- Data
+- Servers
+
+.Impact
+Critical data may be stolen or corrupted
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- The first action to do in order to fix this
+- An other possible action
+|===
+
+Each control is marked with an icon, corresponding to the effective risk of the control
+on the actual state of the cluster:
+
+[frame=none,cols="10,90"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+| The current state of the cluster is good for this control,
+or some minor corrective actions may be needed.
+
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+| The current state of the cluster is not fully compliant for this control,
+a plan for corrective measures should be developed within a reasonable period of time.
+
+^.^|icon:times-circle[role="red",size="3x"]
+| The current state of the cluster is critical regarding this control,
+a plan for corrective measures should be developed as soon as possible.
+
+^.^|icon:question[role="gray",size="3x"]
+| During the audit process, we were unable to determine the actual state of the cluster on this control.
+|===
+
+== Production considerations & performance tuning
+
+=== Outdated versions
+
+Over time, new vulnerabilities will be discovered that can be exploited by low-skilled hackers, leaving your organizations susceptible to attack, data loss, or even fiscal consequences.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Breach
+
+.Vulnerability
+- Exposition to known exploits
+
+.Asset
+- Data
+- Servers
+
+.Impact
+Critical data may be stolen or corrupted
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- HDP 2.6.4 is deployed, 2.6.5 is available, which is not a major version but has a lot of security fixes.
+More infos on https://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.6.5/bk_release-notes/content/CVE.html
+|===
+
+=== Naming, aliases and CNAMES
+
+Use CNAMEs to identify your servers to the cluster so that you can rename and renumber your servers without downtime.
+A Canonical Name record (abbreviated as CNAME record) is a type of resource record in the Domain Name System (DNS)
+used to specify that a domain name is an alias for another domain, the "canonical" domain.
+
+_Example: data001,zk002,primary002,master001, instead of labcentos17.freylab.net_
+
+This setting avoid reconfiguring applications (hdfs/hbase/core-site.xml) when changes occur on the cluster.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+- Long service downtime
+
+.Vulnerability
+- Incapacity of restoring a single server or a service on a single server
+
+.Asset
+- Servers
+
+.Impact
+Long cluster downtime
+
+.Likelihood
+[red]#High# (OS crashes, server reboot and other production issues will certainly happen)
+
+.Risk
+[yellow]#Medium# (batch-oriented cluster, not real-time platform using Kafka/Storm...)
+
+a|
+.Recommandations
+. Update DNS with logical name. Use one logical per service/role/component
+|===
+
+===  Auto-start
+
+Ambari can auto-start Hadoop services, which causes the ambari-agent to attempt re-starting service components in a stopped state without manual effort by a user.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+Interruption of services
+
+.Vulnerability
+Inadequate supervision
+
+.Asset
+Servers
+
+.Impact
+More support for cluster admin and cluster operator
+
+.Likelihood
+[green]#Low# (the actual cluster doesn't use memory-sensitive process like HBase or Solr)
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+. Enable auto-start for all the services on Ambari
+|===
+
+=== HDFS
+
+==== Small files
+
+A small file is one which is significantly smaller than the HDFS block size (default 64MB).
+Reading through small files normally causes lots of seeks and lots of hopping from datanode to datanode to retrieve each small file,
+all of which is an inefficient data access pattern.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+- Failure of information system
+
+.Vulnerability
+- Inadequate supervision
+
+.Asset
+- HDFS
+
+.Impact
+Current disk usage for HDFS is 24.3 GB, for a total capacity of 1.9 TB.
+Around 5000 blocks are used, of an average size of 5 MB, which is far less than the default block size.
+Although the actual size used on HDFS is not that big, leaving this behavior on the cluster may introduce performance issues in the future.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+. Use HDFS archive
+. Don't use partitionning when data are small
+. Use HBase if you have many small data
+|===
+
+===  Yarn
+
+==== Queues
+
+Queues are the primary method used to manage multiple workloads.
+Queues can provide workload isolation and thus guarantee available capacity for different workloads.
+This can help different types of workloads meet Service Level Agreements (SLAs).
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+- Failure of information system
+
+.Vulnerability
+- Uncontrolled use of information system
+
+.Asset
+- Yarn
+
+.Impact
+Only one queue is defined (the default). New jobs can be blocked if some huge jobs are already running
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+. Create multiple queues based on usage: batch, interactive, speed...
+. Bind the jobs to the queues
+. If Oozie is used, create a dedicated queue for the launchers, and an other queue for your process
+|===
+
+==== Container isolation
+
+CGroups is a mechanism for aggregating/partitioning sets of tasks, and all their future children, into hierarchical groups with specialized behaviour.
+From a YARN perspective, this allows containers to be limited in their resource usage.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+- Failure of information system
+
+.Vulnerability
+- Uncontrolled use of information system
+
+.Asset
+- Yarn
+- Servers
+
+.Impact
+- Only one queue is defined (the default). New jobs can be blocked if some huge jobs are already running
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+Change Yarn properties:
+
+- yarn.nodemanager.container-executor.class= org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor
+
+To
+
+- yarn.nodemanager.container-executor.class= org.apache.hadoop.yarn.server.nodemanager.LinuxContainerExecutor
+
+And add:
+
+- yarn.nodemanager.linux-container-executor.resources-handler.class= org.apache.hadoop.yarn.server.nodemanager.util.CgroupsLCEResourcesHandler
+
+Via Ambari, this can be done via the interface by clicking on "CPU Isolation"
+|===
+
+
+== Security
+
+=== Data Protection & Privacy
+
+==== At rest
+
+===== Transparent data encryption
+
+HDFS implements transparent, end-to-end encryption. Once configured, data read from and written to special HDFS directories is transparently encrypted and decrypted without requiring changes to user application code.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Inadequate change management
+- Lack of access control policy
+- Inadequate control of physical access
+
+.Asset
+- HDFS
+- Data
+
+.Impact
+Attacks at the filesystem-level and below (so-called “OS-level attacks”) are possible
+Disks often need to be removed from the cluster and replaced. Human readable residual data remains when data is removed or when disks are decommissioned.
+
+.Likelihood
+[yellow]#Medium# or [red]#High# (depending of the underlying storage system of the virtual host)
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+. Install an configure Hadoop Key Management Server (KMS)
+. Define encryption zones for sensitive data
+|===
+
+==== Wire encryption
+
+===== RPC Encryption
+
+The data transfered between Hadoop services and clients can be encrypted on the wire.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Unprotected network connections
+- Inadequate control of physical access
+
+.Asset
+- All (servers and clients)
+
+.Impact
+Communications between Hadoop services and clients are not encrypted and vulnerable to A Man in the Middle attack, or MITM,
+is a situation wherein a malicious entity can read/write data that is being transmitted between two or more systems.
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+Define hadoop.rpc.protection to privacy in core-site.xml activates data encryption.
+|===
+
+===== Data encryption on block data transfer
+
+The Namennode gives the client the address of the first DataNode (DN) to read or write the block. The actual data transfer between the client and a DN is over Data Transfer Protocol.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Unprotected network connections
+- Inadequate control of physical access
+
+.Asset
+- All HDFS components (servers and clients)
+
+.Impact
+Block transfers between HDFS datanodes and clients are vulnerable to A Man in the Middle attack.
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings:
+
+- dfs.encrypt.data.transfer -> `false`
+- dfs.encrypt.data.transfer.algorithm -> `none`
+- dfs.encrypt.data.transfer.cipher.suites -> `AES/CTR/NoPadding`
+
+And define:
+
+- dfs.encrypt.data.transfer to true in the hdfs-site.xml in order to activate data encryption for data transfer protocol of DataNode.
+- dfs.encrypt.data.transfer.algorithm to either 3des or rc4 to choose the specific encryption algorithm. If nothing is set, then the default on the system is used (usually 3DES.)
+While 3DES is more cryptographically secure, RC4 is substantially faster.
+- dfs.encrypt.data.transfer.cipher.suites to AES/CTR/NoPadding in order to activate AES encryption.
+|===
+
+===== Data Encryption on HTTP
+
+Data transfer between Web-console and clients are protected by using SSL(HTTPS).
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Unprotected network connections
+- Inadequate control of physical access
+
+.Asset
+- All HDFS components (servers and clients)
+
+.Impact
+Block transfers between HDFS datanodes and clients are vulnerable to A Man in the Middle attack.
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings:
+
+- dfs.http.policy -> `HTTP_ONLY`
+- yarn.http.policy -> `HTTP_ONLY`
+- mapreduce.jobhistory.http.policy -> `HTTP_ONLY`
+
+And define:
+
+- dfs.http.policy to either HTTPS_ONLY or HTTP_AND_HTTPS in hdfs-site.xml to enable SSL for web console of HDFS daemons.
+- yarn.http.policy to HTTPS_ONLY in yarn-site.xml to enable SSL for web console of YARN daemons.
+- mapreduce.jobhistory.http.policy to HTTPS_ONLY in mapred-site.xml to enable SSL for web console of MapReduce JobHistory server.
+
+|===
+
+=== Authentication
+
+==== Kerberos
+
+Hadoop uses Kerberos as the basis for strong authentication and identity propagation for both user and services.
+Kerberos is a third party authentication mechanism, in which users and services rely on a third party - the Kerberos server -
+to authenticate each to the other.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Unprotected network connections
+- Inadequate control of physical access
+
+.Asset
+- All HDFS components (servers and clients)
+
+.Impact
+No user identity verification in the cluster
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings:
+
+- hadoop.security.authentication=simple
+- hadoop.security.authorization=false
+
+And define:
+
+- hadoop.security.authentication=kerberos
+- hadoop.security.authorization=true
+|===
+
+==== SPNEGO
+
+By default, access to the HTTP-based services and UIs for the cluster are not configured to require authentication.
+Kerberos authentication can be configured for the Web UIs for HDFS, YARN, MapReduce2, HBase, Oozie, Falcon, and Storm.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+- Theft
+- Vandalism
+- Industrial espionage
+- Malicious code
+- Access by unauthorized persons
+- Damage caused by a third party
+
+.Vulnerability
+- Lack of systems for identification and authentication
+
+.Asset
+- All components (servers and clients)
+
+.Impact
+No user identity verification in the cluster
+
+.Likelihood
+[yellow]#Medium#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings:
+
+- hadoop.http.authentication.simple.anonymous.allowed	-> true
+- hadoop.http.authentication.signature.secret.file	-> none
+- hadoop.http.authentication.type	-> none
+- hadoop.http.authentication.kerberos.keytab	-> none
+- hadoop.http.authentication.kerberos.principal	-> none
+- hadoop.http.filter.initializers	-> none
+- hadoop.http.authentication.cookie.domain -> none
+
+And define in core-site.xml:
+
+- hadoop.http.authentication.simple.anonymous.allowed	-> false
+- hadoop.http.authentication.signature.secret.file	-> /etc/security/http_secret
+- hadoop.http.authentication.type	-> kerberos
+- hadoop.http.authentication.kerberos.keytab	-> /etc/security/keytabs/spnego.service.keytab
+- hadoop.http.authentication.kerberos.principal	-> HTTP/_HOST@EXAMPLE.COM
+- hadoop.http.filter.initializers	-> org.apache.hadoop.security.AuthenticationFilterInitializer
+- hadoop.http.authentication.cookie.domain -> hortonworks.local
+|===
+
+=== Authorization
+
+Authorization defines access rights to resources, or privileges of use (permissions) for users.
+Service Level Authorization is the initial authorization mechanism to ensure clients connecting to a particular Hadoop service have the necessary, pre-configured, permissions and are authorized to access the given service.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+- Information leakage
+
+.Vulnerability
+- Inadequate control of access
+
+.Asset
+- All (Yarn, Hive, HDFS...)
+
+.Impact
+Service Level Authorization is performed much before to other access control checks such as file-permission checks, access control on job queues etc.
+By default, service-level authorization is disabled for Hadoop, which means anyone is allowed to submit jobs or see content in HDFS.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings in core-site.xml:
+
+- hadoop.security.authorization=true
+|===
+
+==== Ranger
+
+Once a user has been authenticated, their access rights must be determined. Authorization defines user access rights to resources. For example, a user may be allowed to create a policy and view reports, but not allowed to edit users and groups. You can use Ranger to set up and manage access to Hadoop services.
+Ranger enables you to create services for specific Hadoop resources (HDFS, HBase, Hive, etc.) and add access policies to those services.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Inadequate control of access
+
+.Asset
+All (Yarn, Hive, HDFS...)
+
+.Impact
+Users are not restricted in terms or resource or access.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+Change the actual settings in yarn-site.xml:
+
+- yarn.acl.enable=true
+- yarn.authorization-provider= org.apache.ranger.authorization.yarn.authorizer.RangerYarnAuthorizer
+
+Change the actual settings in hdfs-site.xml:
+
+- dfs.namenode.inode.attributes.provider.class= org.apache.ranger.authorization.hadoop.RangerHdfsAuthorizer
+
+Change the actual settings in hive-site.xml:
+
+- hive.security.authorization.enabled=true
+- hive.security.authorization.manager= org.apache.ranger.authorization.hive.authorizer.RangerHiveAuthorizerFactory
+
+|===
+
+=== Access
+
+==== Firewall
+
+A firewall is a network security system that monitors and controls incoming and outgoing network traffic based on predetermined security rules.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+- Information leakage
+- Theft
+- Vandalism
+- Industrial espionage
+- Malicious code
+- Access by unauthorized persons
+- Damage caused by a third party
+
+.Vulnerability
+- Unprotected network connections
+
+.Asset
+Servers
+
+.Impact
+May lead to unauthorized access to or from a private network
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- Firewalls should not be present between nodes in the cluster.
+- Placing a firewall between cluster nodes will impact the cluster performance.
+- Placing a firewall around the cluster can be enabled with the understanding that various firewall ports will need to be enabled for communication to the cluster or that Apache Knox will ned to be enabled.
+- In order to allow YARN jobs to run successfully, you need to add custom TCP port range to the YARN configuration by changing the setting:
+yarn.app.mapreduce.am.job.client.port-range=32000-65000
+
+Notes:
+
+. 32000-65000 is the port range which will be used by Application Master to connect to Node Managers. .
+. You can increase the number of ports based on job volume.
+|===
+
+==== Perimeter isolation
+
+===== Edge/Gateway nodes
+
+The Gateway nodes are specially client nodes. The Gateway nodes should have sufficient firewall port access for only the services planned for access by
+external processes and end users and should not have access to internal only or administrative services.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Location vulnerable to flooding
+Uncontrolled copying of data
+Inadequate network management
+
+.Asset
+Edge/Gateway servers
+
+.Impact
+As a main entrypoint of a cluster, gateway/edge services are the privileged target for attackers.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- To minimize network traffic between the cluster and the Gateway node, you should try to restrict access such that end users cannot transfer large
+quantities of data from the HDP cluster through the gateway. For efficient network utilization the gateway should be used only for aggregated
+and reduced sized data subsets.
+|===
+
+===== Knox
+
+The Apache Knox Gateway ("Knox") is a system to extend the reach of Apache Hadoop services to
+users outside of a Hadoop cluster without reducing Hadoop Security. Knox also simplifies
+Hadoop security for users who access the cluster data and execute jobs.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Location vulnerable to flooding
+
+.Asset
+Servers
+
+.Impact
+As a main entrypoint of a cluster, Knox, like other gateway/edge services, are the privileged target for attackers.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+|===
+
+===== Jump box
+
+A jump server or jump host or jumpbox or secure administrative host is a (special-purpose) computer
+on a network typically used to manage devices in a separate security zone.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Location vulnerable to flooding
+
+.Asset
+Servers
+
+.Impact
+Unauthorized access to private network
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+
+|===
+
+==== Administration
+
+===== Ambari
+
+====== Encrypting Database and LDAP Passwords
+
+By default the passwords to access the Ambari database and the LDAP server are stored in a plain text configuration file.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Inadequate control of remote access
+
+.Asset
+Ambari server
+
+.Impact
+No user identity verification in the cluster
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- Use the command line `ambari-server setup-security` in order to encrypt passwords stored in ambari.properties file. You will have to provide a master key for encrypting the passwords.
+|===
+
+====== Non-root install
+
+Applications are meant to be run with non-administrative security so you have to elevate their privileges to interact with the underlying system.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+- Vandalism
+- Malicious code
+- Access by unauthorized persons
+- Damage caused by a third party
+
+.Vulnerability
+- Lack of protection for the nodes
+
+.Asset
+Servers
+
+.Impact
+No user identity verification in the cluster
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- Both Ambari Server and Ambari Agent components allow for non-root operation and should can be configured to operate without direct root access
+|===
+
+
+=== Auditing
+
+==== Ranger
+
+Ranger provides a centralized framework for collecting access audit history and reporting this data, including filtering on various parameters.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+Information leakage
+
+.Vulnerability
+Unauthorized access
+
+.Asset
+Servers
+
+.Impact
+Late observed information leakage
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- Install and configure Ranger
+|===
+
+== Architecture
+
+=== Network
+
+==== Hostnames
+
+Make certain both host Fully Qualified Host Names as well as Host aliases are defined and referenceable by all nodes within the cluster.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:check-circle[role="green",size="3x"]
+a|
+.Threat
+Interruption of business processes
+
+.Vulnerability
+Inadequate network management
+
+.Asset
+Servers
+
+.Impact
+Service discovery issues
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[green]#Medium#
+
+a|
+.Recommandations
+- To ensure that the members of the cluster can communicate with each other, set the hostname of each system to a unique name
+|===
+
+==== MTU
+
+MTU (Maximum Transmission Unit) for a ethernet frame is 1500. A MTU of 9000 is referred to as a jumbo frame.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:question[role="gray",size="3x"]
+a|
+.Threat
+Performance impact
+
+.Vulnerability
+Network overuse
+
+.Asset
+Servers
+
+.Impact
+Higher network overheads and CPU cycles, wasted computation resources.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[green]#Low#
+
+a|
+.Recommandations
+- Define MTU for all interfaces on the cluster to support Jumbo Frames (typically MTU=9000)
+- Do this only if all nodes and switches support this functionality. Inconsistent MTU or undefined MTU configurations can produce serious problems with the network.
+|===
+
+==== Bonding
+
+NIC Bonding (also known as NIC Teaming or Link Aggregation) provides a method for aggregating multiple network interfaces into a single logicalbonded interface.
+The behavior of the bonded interfaces depends upon the mode; generally speaking, modes provide either hot standby or load balancing services.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:question[role="gray",size="3x"]
+a|
+.Threat
+- Interruption of service
+- Failure of communication links
+
+.Vulnerability
+- Lack of redundancy
+
+.Asset
+Interfaces
+
+.Impact
+Loss of connectivity, interruption of critical service such as the Namenode or any master component
+
+.Likelihood
+[green]#Low# (virtual interfaces, but can be applied to the host servers too - ESX/Nutanix -)
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+- Use multiple interfaces in order to increase the bandwidth and/or the availbility
+|===
+
+==== Multihoming
+
+Multihoming is a strategy useful to assure network performance and predictability for both applications and management purposes.
+In multihomed networks the cluster nodes are connected to more than one network interface. There could be multiple reasons for doing so.
+
+- Security: Security requirements may dictate that intra-cluster traffic be confined to a different network than the network used to transfer data in and out of the cluster.
+- Performance: Intra-cluster traffic may use one or more high bandwidth interconnects like Fiber Channel, Infiniband or 10GbE.
+- Failover/Redundancy: The nodes may have multiple network adapters connected to a single network to handle network adapter failure.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:exclamation-triangle[role="yellow",size="3x"]
+a|
+.Threat
+Interruption of service
+
+.Vulnerability
+Uncontrolled use of network
+
+.Asset
+Servers
+
+.Impact
+Network congestion, direct impact of bandwidth used by clients on admin operations like replication and cluster operations.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[yellow]#Medium# (private cluster, non shared, dedicated for one project)
+
+a|
+.Recommandations
+Change the actual settings in core-site.xml to:
+
+- dfs.client.use.datanode.hostname=true
+- dfs.datanode.use.datanode.hostname=true
+- dfs.namenode.rpc-bind-host=0.0.0.0
+- dfs.namenode.servicerpc-bind-host=0.0.0.0
+- dfs.namenode.http-bind-host=0.0.0.0
+- dfs.namenode.https-bind-host=0.0.0.0
+
+Change the actual settings in yarn-site.xml to:
+
+- yarn.resourcemanager.bind-host=0.0.0.0
+- yarn.nodemanager.bind-host=0.0.0.0
+- yarn.timeline-service.bind-host=0.0.0.0
+
+Change the actual settings in mapred-site.xml to:
+
+- mapreduce.jobhistory.bind-host=0.0.0.0
+|===
+
+=== High availbility
+
+==== Yarn
+
+The ResourceManager (RM) is responsible for tracking the resources in a cluster, and scheduling applications (e.g., MapReduce jobs).
+Prior to Hadoop 2.4, the ResourceManager is the single point of failure in a YARN cluster.
+The High Availability feature adds redundancy in the form of an Active/Standby ResourceManager pair to remove this otherwise single point of failure.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+Interruption of service
+
+.Vulnerability
+Lack of redundancy
+
+.Asset
+Yarn ResourceManager
+
+.Impact
+Single point of failure: in case of crash, all the Yarn resources provided by the NodeManagers will be unavailable.
+
+.Likelihood
+[red]#High#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+Change the actual settings to:
+
+- yarn.resourcemanager.zk-address= sd00955105.gsb.loc:2181,sd00955111.gsb.loc:2181,sd00955112.gsb.loc:2181
+- yarn.resourcemanager.ha.enabled=true
+- yarn.resourcemanager.ha.rm-ids=rm1,rm2
+- yarn.resourcemanager.hostname.rm1=sd00955105.gsb.loc
+- yarn.resourcemanager.hostname.rm2=sd00955111.gsb.loc
+- yarn.client.failover-proxy-provider= org.apache.hadoop.yarn.client.RequestHedgingRMFailoverProxyProvider
+|===
+
+==== HDFS
+
+Prior to Hadoop 2.0.0, the NameNode was a single point of failure (SPOF) in an HDFS cluster. Each cluster had a single NameNode, and if that machine or process became unavailable,
+the cluster as a whole would be unavailable until the NameNode was either restarted or brought up on a separate machine.
+With a HA setup with quorum there are two NameNodes configured with one working as the active and the other as the standby instance.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+Interruption of service
+
+.Vulnerability
+Lack of redundancy
+
+.Asset
+HDFS Namenode
+
+.Impact
+Single point of failure: in case of crash, all the HDFS capacity provided by the DataNodes will be unavailable.
+
+.Likelihood
+[red]#High#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+Change the actual settings to:
+
+- fs.defaultFS=hdfs://lab-ey
+- dfs.nameservices=lab-ey
+- dfs.ha.namenodes.lab-ey=nn201,nn202
+- dfs.namenode.rpc-address.lab-ey.nn01=nn01.hdp:8020
+- dfs.namenode.servicerpc-address.lab-ey.nn01=nn01.hdp:54321
+- dfs.namenode.http-address.lab-ey.nn01=nn01.hdp:50070
+- dfs.namenode.https-address.lab-ey.nn01=nn01.hdp:50470
+- dfs.namenode.rpc-address.lab-ey.nn02=nn02.hdp:8020
+- dfs.namenode.servicerpc-address.lab-ey.nn02=nn02.hdp:54321
+- dfs.namenode.http-address.lab-ey.nn02=nn02.hdp:50070
+- dfs.namenode.https-address.lab-ey.nn02=nn02.hdp:50470
+- dfs.client.failover.proxy.provider.nameservices2= org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider
+|===
+
+==== Knox
+
+Apache Knox Gateway is used to help ensure perimeter security and provides a central gateway for Hadoop REST APIs that have varying degrees of authorization, authentication, SSL, and SSO capabilities to enable a single access point for Hadoop.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:times-circle[role="red",size="3x"]
+a|
+.Threat
+Interruption of service
+
+.Vulnerability
+Lack of redundancy
+
+.Asset
+Knox Gateway server
+
+.Impact
+Single point of failure: in case of crash, all clients using Knox will be unavailable.
+
+.Likelihood
+[red]#High#
+
+.Risk
+[red]#High#
+
+a|
+.Recommandations
+- Install Knox only on Edge servers.
+- Use multiple instances of Knox Gateway server.
+- Use a load-balancer (f5, HAProxy, Apache+mod_proxy...) in front of all the instances with a Sticky Session mode.
+- Knox provides basic failover and retry functionality for REST API calls made to a service when service HA has been configured and enabled.
+To enable HA functionality in Knox the following configuration must be added to the topology file:
+
+  maxFailoverAttempts=3;failoverSleep=1000;enabled=true;
+
+Then, for each service configured, use a HA configuration by adding an additional URL:
+
+  <service>
+    <role>{COMPONENT}</role>
+    <url>http://{host1}:50070/{component}</url>
+    <url>http://{host2}:50070/{component}</url>
+  </service>
+
+The additional URLs for standby nodes should be added to the list. The active URL (at the time of configuration) should ideally be added at the top of the list.
+
+|===
+
+=== OS
+
+=== Hardware assessment
+
+==== Memory
+
+===== Transparent Hugepages
+
+Transparent Hugepages is a Linux kernel feature intended to improve performance by making more efficient use of your processor’s memory-mapping hardware.
+It is enabled ("enabled=always") by default in most Linux distributions.
+
+[frame=none,cols="10,45,45"]
+|===
+^.^|icon:question[role="gray",size="3x"]
+a|
+.Threat
+Significant performance impact compromising platfrom stability
+
+.Vulnerability
+Inadequate segregation of process using memory
+
+.Asset
+Servers
+
+.Impact
+Transparent Hugepages gives some applications a small performance improvement (~ 10% at best, 0-3% more typically), but can cause significant performance problems, or even apparent memory leaks at worst.
+
+.Likelihood
+[green]#Low#
+
+.Risk
+[yellow]#Medium#
+
+a|
+.Recommandations
+- Transparent Hugepages should be disabled for all nodes on the cluster.
+|===
+
+
+== Issues
+
+*[WARN ]: org.apache.hadoop.util.NativeCodeLoader - Unable to load native-hadoop library for your platform... using builtin-java classes where applicable*
+
+.Cause
+The reason for this issue is that the path for native-hadoop library files is not set correctly in hadoop_env.sh.
+
+.Resolution
+Correct the native-hadoop library path in hadoop-env.sh, check the value of HADOOP_HOME
+
+*Error message [WARN ]: org.apache.hadoop.hive.metastore.ObjectStore - Failed to get database default, returning NoSuchObjectException*
+
+.Cause
+Metastore and/or HiveServer2 may be down
+
+.Resolution
+Check your Metastore and/or HiveServer2  process status.
+
+== Sources
+
+- https://docs.hortonworks.com/HDPDocuments/HDP2/HDP-2.4.3/bk_Security_Guide/content/index.html

@@ -48,10 +48,12 @@ public class DashboardService {
                 .filter(c -> "ACTIVE".equals(c.getStatus())).count();
         long openTickets = ticketRepository.countByTenantIdAndStatus(tenant.getId(), "OPEN");
         long users = userRepository.findByTenantId(tenant.getId()).size();
+        long bundles = bundleRepository.countByClusterTenantId(tenant.getId());
 
         return DashboardResponse.builder()
                 .totalClusters(clusters)
                 .activeClusters(activeClusters)
+                .totalBundles(bundles)
                 .openTickets(openTickets)
                 .totalUsers(users)
                 .build();

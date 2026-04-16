@@ -1,9 +1,12 @@
 package com.odp.supportplane.service;
 
+import com.odp.supportplane.dto.response.LicenseResponse;
 import com.odp.supportplane.model.License;
 import com.odp.supportplane.model.Tenant;
+import com.odp.supportplane.repository.ClusterRepository;
 import com.odp.supportplane.repository.LicenseRepository;
 import com.odp.supportplane.repository.TenantRepository;
+import com.odp.supportplane.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,6 +21,21 @@ public class LicenseService {
 
     private final LicenseRepository licenseRepository;
     private final TenantRepository tenantRepository;
+    private final ClusterRepository clusterRepository;
+    private final UserRepository userRepository;
+
+    public List<LicenseResponse> findAllWithUsage() {
+        return licenseRepository.findAll().stream()
+                .map(this::buildResponse)
+                .toList();
+    }
+
+    public LicenseResponse buildResponse(License license) {
+        Long tid = license.getTenant().getId();
+        long usedClusters = clusterRepository.countByTenantId(tid);
+        long usedUsers = userRepository.countByTenantIdAndActiveTrue(tid);
+        return LicenseResponse.from(license, usedClusters, usedUsers);
+    }
 
     public List<License> findAll() {
         return licenseRepository.findAll();

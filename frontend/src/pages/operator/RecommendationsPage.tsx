@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
-import { FileText, Plus, CheckCircle, Send } from 'lucide-react'
+import { FileText, Plus, CheckCircle, Send, CheckCircle2, AlertTriangle, XCircle, HelpCircle } from 'lucide-react'
 
 export default function RecommendationsPage() {
   const queryClient = useQueryClient()
@@ -11,6 +11,7 @@ export default function RecommendationsPage() {
   const [severity, setSeverity] = useState('INFO')
   const [clusterId, setClusterId] = useState('')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [sourceFilter, setSourceFilter] = useState('ALL')
 
   const { data: recommendations, isLoading } = useQuery({
     queryKey: ['all-recommendations', statusFilter],
@@ -132,34 +133,53 @@ export default function RecommendationsPage() {
         </div>
       )}
 
-      {/* Status filter */}
-      <div className="flex gap-1 mb-4">
-        {['ALL', 'DRAFT', 'VALIDATED', 'DELIVERED'].map((s) => (
-          <button
-            key={s}
-            onClick={() => setStatusFilter(s)}
-            className={`px-3 py-1 text-xs rounded-full ${
-              statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            {s}
-          </button>
-        ))}
+      {/* Filters */}
+      <div className="flex gap-4 mb-4">
+        <div className="flex gap-1">
+          {['ALL', 'DRAFT', 'VALIDATED', 'DELIVERED'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`px-3 py-1 text-xs rounded-full ${
+                statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1">
+          {['ALL', 'OPERATOR', 'ENGINE'].map((s) => (
+            <button
+              key={s}
+              onClick={() => setSourceFilter(s)}
+              className={`px-3 py-1 text-xs rounded-full ${
+                sourceFilter === s ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
       </div>
 
       {isLoading ? (
         <div className="text-muted-foreground">Loading recommendations...</div>
       ) : (
         <div className="space-y-4">
-          {recommendations?.map((r: any) => (
+          {recommendations?.filter((r: any) => sourceFilter === 'ALL' || r.source === sourceFilter).map((r: any) => (
             <div key={r.id} className="bg-white border rounded-lg p-5">
               <div className="flex items-start justify-between">
                 <div className="flex items-start gap-4 flex-1">
                   <div className="p-2 bg-primary/10 rounded-lg mt-0.5">
-                    <FileText className="w-5 h-5 text-primary" />
+                    {r.findingStatus === 'OK' ? <CheckCircle2 className="w-5 h-5 text-green-600" /> :
+                     r.findingStatus === 'WARNING' ? <AlertTriangle className="w-5 h-5 text-yellow-600" /> :
+                     r.findingStatus === 'CRITICAL' ? <XCircle className="w-5 h-5 text-red-600" /> :
+                     r.findingStatus === 'UNKNOWN' ? <HelpCircle className="w-5 h-5 text-gray-500" /> :
+                     <FileText className="w-5 h-5 text-primary" />}
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
                       <h3 className="font-medium">{r.title}</h3>
                       <span className={`px-2 py-0.5 text-xs rounded-full ${severityColor[r.severity] || 'bg-gray-100'}`}>
                         {r.severity}
@@ -167,12 +187,23 @@ export default function RecommendationsPage() {
                       <span className={`px-2 py-0.5 text-xs rounded-full ${statusColor[r.status] || 'bg-gray-100'}`}>
                         {r.status}
                       </span>
+                      {r.component && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-slate-100 text-slate-600">
+                          {r.component}
+                        </span>
+                      )}
+                      {r.category && (
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-purple-100 text-purple-700">
+                          {r.category}
+                        </span>
+                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">{r.description}</p>
                     <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                       <span>Cluster: {r.clusterName || r.clusterId}</span>
                       <span>Tenant: {r.tenantName || '-'}</span>
                       <span>Source: {r.source}</span>
+                      {r.ruleCode && <span>Rule: {r.ruleCode}</span>}
                     </div>
                   </div>
                 </div>

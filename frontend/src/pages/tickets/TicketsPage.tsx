@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
 import { Ticket, Plus, Search } from 'lucide-react'
+import { Button, Card, StatusBadge, PriorityBadge, TableSkeleton, EmptyState } from '@/components/ui'
 
 export default function TicketsPage() {
   const role = useAuthStore((s) => s.role)
@@ -49,21 +50,6 @@ export default function TicketsPage() {
     })
   }
 
-  const priorityColor: Record<string, string> = {
-    CRITICAL: 'bg-red-100 text-red-800',
-    HIGH: 'bg-orange-100 text-orange-800',
-    MEDIUM: 'bg-yellow-100 text-yellow-800',
-    LOW: 'bg-blue-100 text-blue-800',
-  }
-
-  const statusColor: Record<string, string> = {
-    OPEN: 'bg-green-100 text-green-800',
-    IN_PROGRESS: 'bg-blue-100 text-blue-800',
-    WAITING: 'bg-yellow-100 text-yellow-800',
-    RESOLVED: 'bg-gray-100 text-gray-800',
-    CLOSED: 'bg-gray-100 text-gray-600',
-  }
-
   const filtered = tickets?.filter((t: any) =>
     !search || t.title.toLowerCase().includes(search.toLowerCase())
   )
@@ -71,39 +57,36 @@ export default function TicketsPage() {
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">Tickets</h1>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm hover:bg-primary/90"
-        >
+        <h1 className="text-2xl font-semibold tracking-tight">Tickets</h1>
+        <Button onClick={() => setShowCreate(true)}>
           <Plus className="w-4 h-4" /> New Ticket
-        </button>
+        </Button>
       </div>
 
       {showCreate && (
-        <div className="bg-white border rounded-lg p-6 mb-6">
+        <Card className="p-6 mb-6">
           <h2 className="text-lg font-semibold mb-4">Create Ticket</h2>
           <form onSubmit={handleCreate} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-1">Title</label>
+              <label className="block text-sm font-medium mb-1.5">Title</label>
               <input
                 type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm" required
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" required
               />
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1">Description</label>
+              <label className="block text-sm font-medium mb-1.5">Description</label>
               <textarea
                 value={description} onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm" rows={4} required
+                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" rows={4} required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Priority</label>
+                <label className="block text-sm font-medium mb-1.5">Priority</label>
                 <select
                   value={priority} onChange={(e) => setPriority(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 >
                   <option value="LOW">Low</option>
                   <option value="MEDIUM">Medium</option>
@@ -112,10 +95,10 @@ export default function TicketsPage() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1">Cluster (optional)</label>
+                <label className="block text-sm font-medium mb-1.5">Cluster (optional)</label>
                 <select
                   value={clusterId} onChange={(e) => setClusterId(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-md text-sm"
+                  className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
                 >
                   <option value="">None</option>
                   {clusters?.map((c: any) => (
@@ -125,14 +108,11 @@ export default function TicketsPage() {
               </div>
             </div>
             <div className="flex gap-2">
-              <button type="submit" className="px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm">
-                Create
-              </button>
-              <button type="button" onClick={() => setShowCreate(false)}
-                className="px-4 py-2 border rounded-md text-sm">Cancel</button>
+              <Button type="submit" loading={createMutation.isPending}>Create</Button>
+              <Button variant="secondary" type="button" onClick={() => setShowCreate(false)}>Cancel</Button>
             </div>
           </form>
-        </div>
+        </Card>
       )}
 
       {/* Filters */}
@@ -142,7 +122,7 @@ export default function TicketsPage() {
           <input
             type="text" placeholder="Search tickets..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border rounded-md text-sm"
+            className="w-full pl-10 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
         <div className="flex gap-1">
@@ -150,8 +130,10 @@ export default function TicketsPage() {
             <button
               key={s}
               onClick={() => setFilter(s)}
-              className={`px-3 py-1 text-xs rounded-full ${
-                filter === s ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                filter === s
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {s.replace('_', ' ')}
@@ -161,62 +143,51 @@ export default function TicketsPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading tickets...</div>
+        <TableSkeleton rows={5} cols={5} />
+      ) : filtered?.length === 0 ? (
+        <EmptyState icon={Ticket} title="No tickets found"
+          description={filter !== 'ALL' ? `No tickets with status "${filter.replace('_', ' ')}".` : 'Create your first ticket to get started.'}
+        />
       ) : (
-        <div className="bg-white border rounded-lg overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Title</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Status</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Priority</th>
+              <tr className="border-b bg-gray-50/80">
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Title</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Priority</th>
                 {role === 'OPERATOR' && (
-                  <th className="text-left p-3 text-xs font-medium text-muted-foreground">Tenant</th>
+                  <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tenant</th>
                 )}
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Assigned</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Updated</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Updated</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {filtered?.map((t: any) => (
-                <tr key={t.id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={t.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="p-3">
                     <Link to={`/tickets/${t.id}`} className="text-sm font-medium text-primary hover:underline">
                       <div className="flex items-center gap-2">
-                        <Ticket className="w-4 h-4" />
-                        {t.title}
+                        <Ticket className="w-4 h-4 shrink-0" />
+                        <span className="truncate max-w-[300px]">{t.title}</span>
                       </div>
                     </Link>
                   </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${statusColor[t.status] || 'bg-gray-100'}`}>
-                      {t.status?.replace('_', ' ')}
-                    </span>
-                  </td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${priorityColor[t.priority] || 'bg-gray-100'}`}>
-                      {t.priority}
-                    </span>
-                  </td>
+                  <td className="p-3"><StatusBadge value={t.status} /></td>
+                  <td className="p-3"><PriorityBadge value={t.priority} /></td>
                   {role === 'OPERATOR' && (
                     <td className="p-3 text-sm text-muted-foreground">{t.tenantName || '-'}</td>
                   )}
-                  <td className="p-3 text-sm text-muted-foreground">{t.assignedToName || 'Unassigned'}</td>
+                  <td className="p-3 text-sm text-muted-foreground">{t.assignedToName || <span className="italic">Unassigned</span>}</td>
                   <td className="p-3 text-xs text-muted-foreground">
                     {t.updatedAt ? new Date(t.updatedAt).toLocaleDateString() : '-'}
                   </td>
                 </tr>
               ))}
-              {(!filtered || filtered.length === 0) && (
-                <tr>
-                  <td colSpan={role === 'OPERATOR' ? 6 : 5} className="p-8 text-center text-muted-foreground text-sm">
-                    No tickets found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   )

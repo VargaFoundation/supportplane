@@ -3,10 +3,12 @@ package com.odp.supportplane.service;
 import com.odp.supportplane.config.TenantContext;
 import com.odp.supportplane.model.Cluster;
 import com.odp.supportplane.model.ClusterOtp;
+import com.odp.supportplane.model.License;
 import com.odp.supportplane.model.Tenant;
 import com.odp.supportplane.repository.BundleRepository;
 import com.odp.supportplane.repository.ClusterOtpRepository;
 import com.odp.supportplane.repository.ClusterRepository;
+import com.odp.supportplane.repository.LicenseRepository;
 import com.odp.supportplane.repository.RecommendationRepository;
 import com.odp.supportplane.repository.TenantRepository;
 import com.odp.supportplane.repository.TicketCommentRepository;
@@ -28,6 +30,7 @@ public class ClusterService {
     private final ClusterRepository clusterRepository;
     private final ClusterOtpRepository clusterOtpRepository;
     private final TenantRepository tenantRepository;
+    private final LicenseRepository licenseRepository;
     private final BundleRepository bundleRepository;
     private final RecommendationRepository recommendationRepository;
     private final TicketRepository ticketRepository;
@@ -47,6 +50,14 @@ public class ClusterService {
     @Transactional
     public ClusterOtp attachCluster(String clusterId, String name) {
         Tenant tenant = getCurrentTenant();
+
+        // Enforce license limit
+        licenseRepository.findByTenantId(tenant.getId()).ifPresent(license -> {
+            long currentCount = clusterRepository.countByTenantId(tenant.getId());
+            if (license.getMaxClusters() != null && currentCount >= license.getMaxClusters()) {
+                throw new RuntimeException("License limit reached: maximum " + license.getMaxClusters() + " clusters allowed");
+            }
+        });
 
         Cluster cluster = Cluster.builder()
                 .tenant(tenant)
@@ -101,6 +112,16 @@ public class ClusterService {
 
     public Optional<Cluster> findByClusterId(String clusterId) {
         return clusterRepository.findByClusterId(clusterId);
+    }
+
+    @Transactional
+    public Cluster rename(Long id, String name) {
+        Cluster cluster = clusterRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Cluster not found"));
+        if (name != null && !name.isBlank()) {
+            cluster.setName(name);
+        }
+        return clusterRepository.save(cluster);
     }
 
     @Transactional

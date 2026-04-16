@@ -2,7 +2,10 @@ package com.odp.supportplane.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Entity
 @Table(name = "recommendations")
@@ -30,6 +33,39 @@ public class Recommendation {
 
     @Builder.Default
     private String status = "DRAFT";
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "rule_id")
+    private RecommendationRule rule;
+
+    private String category;
+
+    private String subcategory;
+
+    private String component;
+
+    private String threat;
+
+    private String vulnerability;
+
+    private String asset;
+
+    private String impact;
+
+    private String likelihood;
+
+    private String risk;
+
+    @Column(name = "recommendations_text")
+    private String recommendationsText;
+
+    @Column(name = "finding_status")
+    @Builder.Default
+    private String findingStatus = "UNKNOWN";
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evaluation_data")
+    private Map<String, Object> evaluationData;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

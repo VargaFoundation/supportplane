@@ -65,6 +65,13 @@ public class ClusterController {
         return ResponseEntity.ok(Map.of("status", "deleted"));
     }
 
+    @PutMapping("/{id}")
+    public ResponseEntity<ClusterResponse> renameCluster(@PathVariable Long id,
+                                                          @RequestBody Map<String, String> body) {
+        Cluster cluster = clusterService.rename(id, body.get("name"));
+        return ResponseEntity.ok(ClusterResponse.from(cluster));
+    }
+
     @GetMapping("/{id}")
     public ResponseEntity<ClusterResponse> getCluster(@PathVariable Long id) {
         return clusterService.findById(id)

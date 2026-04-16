@@ -16,6 +16,9 @@ import AllClustersPage from '@/pages/operator/AllClustersPage'
 import TenantsPage from '@/pages/operator/TenantsPage'
 import LicensesPage from '@/pages/operator/LicensesPage'
 import RecommendationsPage from '@/pages/operator/RecommendationsPage'
+import RulesPage from '@/pages/operator/RulesPage'
+import ClusterArchitecturePage from '@/pages/clusters/ClusterArchitecturePage'
+import AuditReportPage from '@/pages/clusters/AuditReportPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -32,6 +35,8 @@ export default function App() {
         <Route index element={<Dashboard />} />
         <Route path="clusters" element={<ClustersPage />} />
         <Route path="clusters/:id" element={<ClusterDetailPage />} />
+        <Route path="clusters/:id/audit" element={<ClusterArchitecturePage />} />
+        <Route path="clusters/:id/audit-report" element={<AuditReportPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="bundles/:id" element={<BundleViewerPage />} />
@@ -42,6 +47,7 @@ export default function App() {
         <Route path="operator/tenants" element={<TenantsPage />} />
         <Route path="operator/licenses" element={<LicensesPage />} />
         <Route path="operator/recommendations" element={<RecommendationsPage />} />
+        <Route path="operator/rules" element={<RulesPage />} />
       </Route>
     </Routes>
   )

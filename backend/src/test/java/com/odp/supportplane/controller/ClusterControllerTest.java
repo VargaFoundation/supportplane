@@ -130,12 +130,22 @@ class ClusterControllerTest {
 
     @Test
     void detachCluster_success() throws Exception {
-        mockMvc.perform(delete("/api/v1/clusters/1")
+        mockMvc.perform(post("/api/v1/clusters/1/detach")
                         .with(TestHelper.adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("detached"));
 
         verify(clusterService).detach(1L);
+    }
+
+    @Test
+    void deleteCluster_success() throws Exception {
+        mockMvc.perform(delete("/api/v1/clusters/1")
+                        .with(TestHelper.adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("deleted"));
+
+        verify(clusterService).delete(1L);
     }
 
     @Test
@@ -163,6 +173,38 @@ class ClusterControllerTest {
 
         mockMvc.perform(get("/api/v1/clusters/1/bundles")
                         .with(TestHelper.adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
+    }
+
+    // --- Multi-realm / operator access tests ---
+
+    @Test
+    void listClusters_operator_success() throws Exception {
+        when(clusterService.getClusters()).thenReturn(List.of(testCluster()));
+
+        mockMvc.perform(get("/api/v1/clusters")
+                        .with(TestHelper.operatorJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].clusterId").value("cl-001"));
+    }
+
+    @Test
+    void getCluster_operator_success() throws Exception {
+        when(clusterService.findById(1L)).thenReturn(Optional.of(testCluster()));
+
+        mockMvc.perform(get("/api/v1/clusters/1")
+                        .with(TestHelper.operatorJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Production"));
+    }
+
+    @Test
+    void getClusterBundles_operator_success() throws Exception {
+        when(bundleService.getBundlesForCluster(1L)).thenReturn(List.of());
+
+        mockMvc.perform(get("/api/v1/clusters/1/bundles")
+                        .with(TestHelper.operatorJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
     }

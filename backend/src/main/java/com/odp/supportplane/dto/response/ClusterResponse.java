@@ -11,6 +11,8 @@ public class ClusterResponse {
     private String name;
     private String status;
     private Boolean otpValidated;
+    private String tenantName;
+    private Long tenantId;
     private LocalDateTime lastBundleAt;
     private LocalDateTime createdAt;
 
@@ -21,6 +23,10 @@ public class ClusterResponse {
         r.setName(cluster.getName());
         r.setStatus(cluster.getStatus());
         r.setOtpValidated(cluster.getOtpValidated());
+        if (cluster.getTenant() != null) {
+            r.setTenantName(cluster.getTenant().getName());
+            r.setTenantId(cluster.getTenant().getId());
+        }
         r.setLastBundleAt(cluster.getLastBundleAt());
         r.setCreatedAt(cluster.getCreatedAt());
         return r;

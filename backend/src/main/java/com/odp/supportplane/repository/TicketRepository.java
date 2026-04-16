@@ -11,4 +11,7 @@ public interface TicketRepository extends JpaRepository<Ticket, Long> {
     List<Ticket> findByAssignedToId(Long userId);
     long countByTenantIdAndStatus(Long tenantId, String status);
     void deleteByClusterId(Long clusterId);
+    List<Ticket> findByTenantIdAndStatusOrderByCreatedAtDesc(Long tenantId, String status);
+    List<Ticket> findByStatusOrderByCreatedAtDesc(String status);
+    List<Ticket> findAllByOrderByCreatedAtDesc();
 }

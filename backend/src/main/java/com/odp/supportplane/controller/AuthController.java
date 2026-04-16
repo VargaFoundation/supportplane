@@ -84,4 +84,30 @@ public class AuthController {
                     .body(Map.of("error", "Authentication failed"));
         }
     }
+
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
+        String refreshToken = body.get("refreshToken");
+        String tenantId = body.get("tenantId");
+        if (refreshToken == null || tenantId == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Missing refreshToken or tenantId"));
+        }
+
+        String realm = "support".equals(tenantId) ? supportRealm : clientsRealm;
+
+        try {
+            Map<String, Object> tokens = keycloakService.refreshToken(realm, refreshToken);
+            AuthResponse response = new AuthResponse(
+                    (String) tokens.get("access_token"),
+                    (String) tokens.get("refresh_token"),
+                    "Bearer",
+                    tokens.get("expires_in") instanceof Number n ? n.longValue() : 300,
+                    tenantId
+            );
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Token refresh failed"));
+        }
+    }
 }

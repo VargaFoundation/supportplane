@@ -53,7 +53,7 @@ class TicketControllerTest {
 
     @Test
     void listTickets_success() throws Exception {
-        when(ticketService.getTickets()).thenReturn(List.of(testTicket()));
+        when(ticketService.getTickets(null)).thenReturn(List.of(testTicket()));
 
         mockMvc.perform(get("/api/v1/tickets")
                         .with(TestHelper.adminJwt()))
@@ -161,5 +161,27 @@ class TicketControllerTest {
                         .with(TestHelper.adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
+    }
+
+    // --- Operator (support realm) access tests ---
+
+    @Test
+    void listTickets_operator_success() throws Exception {
+        when(ticketService.getTickets(null)).thenReturn(List.of(testTicket()));
+
+        mockMvc.perform(get("/api/v1/tickets")
+                        .with(TestHelper.operatorJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].title").value("HDFS issue"));
+    }
+
+    @Test
+    void getTicket_operator_success() throws Exception {
+        when(ticketService.findById(1L)).thenReturn(Optional.of(testTicket()));
+
+        mockMvc.perform(get("/api/v1/tickets/1")
+                        .with(TestHelper.operatorJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value("HDFS issue"));
     }
 }

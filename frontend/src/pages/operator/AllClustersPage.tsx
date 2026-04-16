@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import api from '@/lib/api'
 import { Server, Search } from 'lucide-react'
+import { Card, StatusBadge, TableSkeleton, EmptyState } from '@/components/ui'
 
 export default function AllClustersPage() {
   const [search, setSearch] = useState('')
@@ -12,12 +13,6 @@ export default function AllClustersPage() {
     queryKey: ['all-clusters'],
     queryFn: () => api.get('/clusters', { params: { all: true } }).then((r) => r.data),
   })
-
-  const statusColor: Record<string, string> = {
-    ACTIVE: 'bg-green-100 text-green-800',
-    PENDING: 'bg-yellow-100 text-yellow-800',
-    DETACHED: 'bg-gray-100 text-gray-800',
-  }
 
   const filtered = clusters?.filter((c: any) => {
     const matchSearch = !search ||
@@ -30,7 +25,7 @@ export default function AllClustersPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold mb-6">All Clusters</h1>
+      <h1 className="text-2xl font-semibold tracking-tight mb-6">All Clusters</h1>
 
       {/* Filters */}
       <div className="flex items-center gap-4 mb-4">
@@ -39,7 +34,7 @@ export default function AllClustersPage() {
           <input
             type="text" placeholder="Search by name, ID, or tenant..." value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-3 py-2 border rounded-md text-sm"
+            className="w-full pl-10 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors"
           />
         </div>
         <div className="flex gap-1">
@@ -47,8 +42,10 @@ export default function AllClustersPage() {
             <button
               key={s}
               onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1 text-xs rounded-full ${
-                statusFilter === s ? 'bg-primary text-primary-foreground' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              className={`px-3 py-1.5 text-xs font-medium rounded-full transition-colors ${
+                statusFilter === s
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
               {s}
@@ -58,56 +55,50 @@ export default function AllClustersPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-muted-foreground">Loading clusters...</div>
+        <TableSkeleton rows={6} cols={5} />
+      ) : filtered?.length === 0 ? (
+        <EmptyState icon={Server} title="No clusters found"
+          description={search ? 'Try adjusting your search criteria.' : 'No clusters have been attached yet.'} />
       ) : (
-        <div className="bg-white border rounded-lg overflow-hidden">
+        <Card className="overflow-hidden">
           <table className="w-full">
             <thead>
-              <tr className="border-b bg-gray-50">
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Cluster</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Cluster ID</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Tenant</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Status</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Bundles</th>
-                <th className="text-left p-3 text-xs font-medium text-muted-foreground">Last Bundle</th>
+              <tr className="border-b bg-gray-50/80">
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Cluster</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider hidden lg:table-cell">Cluster ID</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Tenant</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
+                <th className="text-left p-3 text-xs font-medium text-muted-foreground uppercase tracking-wider">Last Bundle</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {filtered?.map((c: any) => (
-                <tr key={c.id} className="border-b last:border-0 hover:bg-gray-50">
+                <tr key={c.id} className="hover:bg-gray-50/60 transition-colors">
                   <td className="p-3">
                     <Link to={`/clusters/${c.id}`} className="flex items-center gap-3">
-                      <div className="p-1.5 bg-primary/10 rounded">
+                      <div className="p-1.5 bg-primary/8 rounded-lg shrink-0">
                         <Server className="w-4 h-4 text-primary" />
                       </div>
-                      <span className="text-sm font-medium text-primary hover:underline">
+                      <span className="text-sm font-medium text-primary hover:underline truncate">
                         {c.name || c.clusterId}
                       </span>
                     </Link>
                   </td>
-                  <td className="p-3 text-sm font-mono text-muted-foreground">{c.clusterId}</td>
-                  <td className="p-3 text-sm">{c.tenantName || '-'}</td>
-                  <td className="p-3">
-                    <span className={`px-2 py-0.5 text-xs rounded-full ${statusColor[c.status] || 'bg-gray-100'}`}>
-                      {c.status}
-                    </span>
+                  <td className="p-3 hidden lg:table-cell">
+                    <code className="text-xs font-mono text-muted-foreground bg-gray-50 px-1.5 py-0.5 rounded">
+                      {c.clusterId?.slice(0, 16)}...
+                    </code>
                   </td>
-                  <td className="p-3 text-sm text-muted-foreground">{c.bundleCount ?? '-'}</td>
+                  <td className="p-3 text-sm">{c.tenantName || '-'}</td>
+                  <td className="p-3"><StatusBadge value={c.status} /></td>
                   <td className="p-3 text-xs text-muted-foreground">
-                    {c.lastBundleAt ? new Date(c.lastBundleAt).toLocaleString() : 'Never'}
+                    {c.lastBundleAt ? new Date(c.lastBundleAt).toLocaleString() : <span className="italic">Never</span>}
                   </td>
                 </tr>
               ))}
-              {(!filtered || filtered.length === 0) && (
-                <tr>
-                  <td colSpan={6} className="p-8 text-center text-muted-foreground text-sm">
-                    No clusters found.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
-        </div>
+        </Card>
       )}
     </div>
   )

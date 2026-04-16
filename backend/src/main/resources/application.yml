@@ -34,6 +34,7 @@ keycloak:
 app:
   bundle-storage-path: /var/lib/supportplane/bundles
   otp-expiry-minutes: 10
+  encryption-key: ${APP_ENCRYPTION_KEY:}
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
 

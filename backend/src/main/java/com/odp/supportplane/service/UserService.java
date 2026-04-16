@@ -1,8 +1,10 @@
 package com.odp.supportplane.service;
 
+import com.odp.supportplane.config.AccessControl;
 import com.odp.supportplane.config.TenantContext;
 import com.odp.supportplane.model.Tenant;
 import com.odp.supportplane.model.User;
+import com.odp.supportplane.repository.LicenseRepository;
 import com.odp.supportplane.repository.TenantRepository;
 import com.odp.supportplane.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +21,8 @@ public class UserService {
     private final UserRepository userRepository;
     private final TenantRepository tenantRepository;
     private final KeycloakService keycloakService;
+    private final LicenseRepository licenseRepository;
+    private final AuditService auditService;
 
     public List<User> getUsers() {
         if (TenantContext.isOperator()) {
@@ -37,9 +41,27 @@ public class UserService {
     }
 
     @Transactional
-    public User create(String email, String fullName, String password, String role) {
-        Tenant tenant = getCurrentTenant();
-        String realm = TenantContext.isOperator() ? "support" : "clients";
+    public User create(String email, String fullName, String password, String role, String targetTenantId) {
+        AccessControl.requireAdminOrOperator();
+
+        Tenant tenant;
+        if (TenantContext.isOperator() && targetTenantId != null && !targetTenantId.isBlank()) {
+            tenant = tenantRepository.findByTenantId(targetTenantId)
+                    .orElseThrow(() -> new RuntimeException("Tenant not found: " + targetTenantId));
+        } else {
+            tenant = getCurrentTenant();
+        }
+
+        // Enforce license limit
+        licenseRepository.findByTenantId(tenant.getId()).ifPresent(license -> {
+            long currentCount = userRepository.countByTenantIdAndActiveTrue(tenant.getId());
+            if (license.getMaxUsers() != null && currentCount >= license.getMaxUsers()) {
+                throw new RuntimeException("License limit reached: maximum " + license.getMaxUsers() + " users allowed");
+            }
+        });
+
+        // Tenant users always go to the clients realm, regardless of who creates them
+        String realm = "clients";
 
         String keycloakId = keycloakService.createUser(
                 realm, email, password, fullName,
@@ -52,11 +74,43 @@ public class UserService {
                 .fullName(fullName)
                 .role(role != null ? role : "USER")
                 .build();
-        return userRepository.save(user);
+        user = userRepository.save(user);
+        auditService.logForTenant(tenant, "USER_CREATED", "USER", String.valueOf(user.getId()), email);
+        return user;
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        AccessControl.requireAdminOrOperator();
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Verify caller has access to this user's tenant
+        if (!TenantContext.isOperator()) {
+            Tenant callerTenant = getCurrentTenant();
+            if (!user.getTenant().getId().equals(callerTenant.getId())) {
+                throw new RuntimeException("User not found");
+            }
+        }
+
+        user.setActive(false);
+        userRepository.save(user);
+        auditService.logForTenant(user.getTenant(), "USER_DEACTIVATED", "USER", String.valueOf(id), user.getEmail());
+
+        // Disable in Keycloak
+        if (user.getKeycloakId() != null) {
+            try {
+                String realm = "clients";
+                keycloakService.disableUser(realm, user.getKeycloakId());
+            } catch (Exception e) {
+                // Non-critical: user is already deactivated in DB
+            }
+        }
     }
 
     @Transactional
     public User update(Long id, String fullName, String role, Boolean active) {
+        AccessControl.requireAdminOrOperator();
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 

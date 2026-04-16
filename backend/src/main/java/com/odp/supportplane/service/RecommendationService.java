@@ -1,10 +1,14 @@
 package com.odp.supportplane.service;
 
+import com.odp.supportplane.config.AccessControl;
+import com.odp.supportplane.config.TenantContext;
 import com.odp.supportplane.model.Cluster;
 import com.odp.supportplane.model.Recommendation;
+import com.odp.supportplane.model.Tenant;
 import com.odp.supportplane.model.User;
 import com.odp.supportplane.repository.ClusterRepository;
 import com.odp.supportplane.repository.RecommendationRepository;
+import com.odp.supportplane.repository.TenantRepository;
 import com.odp.supportplane.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,20 @@ public class RecommendationService {
     private final RecommendationRepository recommendationRepository;
     private final ClusterRepository clusterRepository;
     private final UserRepository userRepository;
+    private final TenantRepository tenantRepository;
+
+    public List<Recommendation> getAll(String status) {
+        if (TenantContext.isOperator()) {
+            if (status != null && !status.isBlank()) {
+                return recommendationRepository.findByStatusOrderByCreatedAtDesc(status);
+            }
+            return recommendationRepository.findAllByOrderByCreatedAtDesc();
+        }
+        String tenantSlug = TenantContext.getTenantId();
+        Tenant tenant = tenantRepository.findByTenantId(tenantSlug)
+                .orElseThrow(() -> new RuntimeException("Tenant not found"));
+        return recommendationRepository.findByClusterTenantIdOrderByCreatedAtDesc(tenant.getId());
+    }
 
     public List<Recommendation> getForCluster(Long clusterId) {
         return recommendationRepository.findByClusterIdOrderByCreatedAtDesc(clusterId);
@@ -32,6 +50,7 @@ public class RecommendationService {
     @Transactional
     public Recommendation create(Long clusterId, String title, String description,
                                    String severity, Long createdById) {
+        AccessControl.requireOperator();
         Cluster cluster = clusterRepository.findById(clusterId)
                 .orElseThrow(() -> new RuntimeException("Cluster not found"));
         User createdBy = createdById != null ? userRepository.findById(createdById).orElse(null) : null;

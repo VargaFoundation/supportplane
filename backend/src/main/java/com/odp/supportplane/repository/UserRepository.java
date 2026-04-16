@@ -9,4 +9,5 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByKeycloakId(String keycloakId);
     Optional<User> findByEmail(String email);
     List<User> findByTenantId(Long tenantId);
+    long countByTenantIdAndActiveTrue(Long tenantId);
 }
