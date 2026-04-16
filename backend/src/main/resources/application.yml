@@ -23,12 +23,6 @@ spring:
     multipart:
       max-file-size: 500MB
       max-request-size: 500MB
-  security:
-    oauth2:
-      resourceserver:
-        jwt:
-          issuer-uri: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}/realms/${KEYCLOAK_CLIENTS_REALM:clients}
-
 keycloak:
   auth-server-url: ${KEYCLOAK_AUTH_SERVER_URL:http://localhost:8080}
   clients-realm: ${KEYCLOAK_CLIENTS_REALM:clients}

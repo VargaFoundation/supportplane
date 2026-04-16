@@ -7,8 +7,7 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
-import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
+import org.springframework.security.oauth2.server.resource.authentication.JwtIssuerAuthenticationManagerResolver;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -25,6 +24,15 @@ public class SecurityConfig {
 
     @Value("${app.cors.allowed-origins:http://localhost:3000}")
     private String allowedOrigins;
+
+    @Value("${keycloak.auth-server-url}")
+    private String keycloakUrl;
+
+    @Value("${keycloak.clients-realm}")
+    private String clientsRealm;
+
+    @Value("${keycloak.support-realm}")
+    private String supportRealm;
 
     private final TenantFilter tenantFilter;
 
@@ -47,22 +55,22 @@ public class SecurityConfig {
                 .anyRequest().authenticated()
             )
             .oauth2ResourceServer(oauth2 -> oauth2
-                .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
+                .authenticationManagerResolver(multiRealmAuthenticationManagerResolver())
             )
             .addFilterAfter(tenantFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
     }
 
+    /**
+     * Resolves the correct AuthenticationManager based on the JWT issuer claim.
+     * Accepts tokens from both the clients realm (tenants) and the support realm (operators).
+     */
     @Bean
-    public JwtAuthenticationConverter jwtAuthenticationConverter() {
-        JwtGrantedAuthoritiesConverter grantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
-        grantedAuthoritiesConverter.setAuthoritiesClaimName("realm_access.roles");
-        grantedAuthoritiesConverter.setAuthorityPrefix("ROLE_");
-
-        JwtAuthenticationConverter jwtAuthenticationConverter = new JwtAuthenticationConverter();
-        jwtAuthenticationConverter.setJwtGrantedAuthoritiesConverter(grantedAuthoritiesConverter);
-        return jwtAuthenticationConverter;
+    public JwtIssuerAuthenticationManagerResolver multiRealmAuthenticationManagerResolver() {
+        String clientsIssuer = keycloakUrl + "/realms/" + clientsRealm;
+        String supportIssuer = keycloakUrl + "/realms/" + supportRealm;
+        return JwtIssuerAuthenticationManagerResolver.fromTrustedIssuers(clientsIssuer, supportIssuer);
     }
 
     @Bean
