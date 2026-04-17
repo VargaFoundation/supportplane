@@ -13,6 +13,8 @@ public class ClusterResponse {
     private Boolean otpValidated;
     private String tenantName;
     private Long tenantId;
+    private String sourceIp;
+    private String geoLocation;
     private LocalDateTime lastBundleAt;
     private LocalDateTime createdAt;
 
@@ -27,6 +29,8 @@ public class ClusterResponse {
             r.setTenantName(cluster.getTenant().getName());
             r.setTenantId(cluster.getTenant().getId());
         }
+        r.setSourceIp(cluster.getSourceIp());
+        r.setGeoLocation(cluster.getGeoLocation());
         r.setLastBundleAt(cluster.getLastBundleAt());
         r.setCreatedAt(cluster.getCreatedAt());
         return r;

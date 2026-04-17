@@ -1,6 +1,5 @@
 package com.odp.supportplane.service;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.odp.supportplane.model.Bundle;
 import com.odp.supportplane.model.Cluster;
@@ -51,72 +50,37 @@ public class BundleParsingService {
             Map<String, Object> bundleMetadata = new HashMap<>();
             Map<String, Object> clusterMetadata = new HashMap<>();
 
+            // JSON files that go into bundle metadata vs cluster metadata
+            var bundleFiles = java.util.Set.of("manifest.json");
+            var clusterFiles = java.util.Set.of("topology.json", "service_health.json", "system_info.json",
+                    "kerberos_status.json", "ssl_certs.json", "kernel_params.json", "metrics.json",
+                    "jmx_metrics.json", "granular_metrics.json", "yarn_queues.json", "hdfs_report.json",
+                    "config_drift.json", "benchmarks.json", "alert_history.json", "hbase_metrics.json",
+                    "impala_metrics.json", "kudu_metrics.json", "hive_metrics.json", "zookeeper_metrics.json",
+                    "atlas_metrics.json", "ranger_metrics.json", "nifi_metrics.json", "kafka_metrics.json",
+                    "spark_metrics.json", "oozie_metrics.json", "solr_metrics.json", "log_tails.json");
+
             try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(zipData))) {
                 ZipEntry entry;
                 while ((entry = zis.getNextEntry()) != null) {
                     String name = entry.getName();
                     if (entry.isDirectory()) continue;
 
-                    byte[] content = zis.readAllBytes();
-
-                    switch (name) {
-                        case "manifest.json" -> bundleMetadata.put("manifest",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "topology.json" -> clusterMetadata.put("topology",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "service_health.json" -> clusterMetadata.put("service_health",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "system_info.json" -> clusterMetadata.put("system_info",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "kerberos_status.json" -> clusterMetadata.put("kerberos_status",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "ssl_certs.json" -> clusterMetadata.put("ssl_certs",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "kernel_params.json" -> clusterMetadata.put("kernel_params",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "metrics.json" -> clusterMetadata.put("metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "jmx_metrics.json" -> clusterMetadata.put("jmx_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "granular_metrics.json" -> clusterMetadata.put("granular_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "yarn_queues.json" -> clusterMetadata.put("yarn_queues",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "hdfs_report.json" -> clusterMetadata.put("hdfs_report",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "config_drift.json" -> clusterMetadata.put("config_drift",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "benchmarks.json" -> clusterMetadata.put("benchmarks",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "alert_history.json" -> clusterMetadata.put("alert_history",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "hbase_metrics.json" -> clusterMetadata.put("hbase_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "impala_metrics.json" -> clusterMetadata.put("impala_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "kudu_metrics.json" -> clusterMetadata.put("kudu_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "hive_metrics.json" -> clusterMetadata.put("hive_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "zookeeper_metrics.json" -> clusterMetadata.put("zookeeper_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "atlas_metrics.json" -> clusterMetadata.put("atlas_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "ranger_metrics.json" -> clusterMetadata.put("ranger_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "nifi_metrics.json" -> clusterMetadata.put("nifi_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "kafka_metrics.json" -> clusterMetadata.put("kafka_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "spark_metrics.json" -> clusterMetadata.put("spark_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "oozie_metrics.json" -> clusterMetadata.put("oozie_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        case "solr_metrics.json" -> clusterMetadata.put("solr_metrics",
-                                objectMapper.readValue(content, new TypeReference<Map<String, Object>>() {}));
-                        default -> {
-                            // Skip config files and other entries
+                    // Parse JSON files generically (handles both maps and arrays at root)
+                    if (name.endsWith(".json")) {
+                        try {
+                            byte[] content = zis.readAllBytes();
+                            String key = name.replace(".json", "");
+                            Object parsed = objectMapper.readValue(content, Object.class);
+                            if (bundleFiles.contains(name)) {
+                                bundleMetadata.put(key, parsed);
+                            } else if (clusterFiles.contains(name)) {
+                                clusterMetadata.put(key, parsed);
+                            }
+                        } catch (Exception e) {
+                            log.debug("Skipping unparseable JSON: {}", name);
                         }
+                        continue;
                     }
                 }
             }

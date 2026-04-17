@@ -59,13 +59,24 @@ public class ClusterService {
             }
         });
 
-        Cluster cluster = Cluster.builder()
-                .tenant(tenant)
-                .clusterId(clusterId)
-                .name(name != null ? name : clusterId)
-                .status("PENDING")
-                .build();
-        cluster = clusterRepository.save(cluster);
+        // Check if cluster already exists as DISCOVERED (orphan) — adopt it
+        Cluster cluster = clusterRepository.findByClusterId(clusterId).orElse(null);
+        if (cluster != null && "DISCOVERED".equals(cluster.getStatus()) && cluster.getTenant() == null) {
+            cluster.setTenant(tenant);
+            cluster.setName(name != null ? name : cluster.getName());
+            cluster.setStatus("PENDING");
+            cluster = clusterRepository.save(cluster);
+        } else if (cluster != null) {
+            throw new RuntimeException("Cluster already registered: " + clusterId);
+        } else {
+            cluster = Cluster.builder()
+                    .tenant(tenant)
+                    .clusterId(clusterId)
+                    .name(name != null ? name : clusterId)
+                    .status("PENDING")
+                    .build();
+            cluster = clusterRepository.save(cluster);
+        }
 
         String otpCode = OTPGenerator.generate();
         ClusterOtp otp = ClusterOtp.builder()

@@ -136,6 +136,10 @@ public class RecommendationEngineService {
                 return evaluateRangeCheck(condition, metadata, rule.getDefaultSeverity());
             case "list_not_empty":
                 return evaluateListNotEmpty(condition, metadata, rule.getDefaultSeverity());
+            case "count_check":
+                return evaluateCountCheck(condition, metadata, rule.getDefaultSeverity());
+            case "multi_path_check":
+                return evaluateMultiPathCheck(condition, metadata, rule.getDefaultSeverity());
             case "always":
                 return "UNKNOWN";
             default:
@@ -339,6 +343,73 @@ public class RecommendationEngineService {
             return ((java.util.Collection<?>) actual).isEmpty() ? "OK" : severityToFindingStatus(defaultSeverity);
         }
         return "UNKNOWN";
+    }
+
+    /**
+     * Count check: counts elements in a list/collection and compares with a threshold.
+     * Condition: {"type": "count_check", "path": "...", "threshold": N, "direction": "above"|"below"}
+     */
+    @SuppressWarnings("unchecked")
+    private String evaluateCountCheck(Map<String, Object> condition,
+                                       Map<String, Object> metadata,
+                                       String defaultSeverity) {
+        String path = (String) condition.get("path");
+        Object thresholdObj = condition.get("threshold");
+        String direction = (String) condition.getOrDefault("direction", "below");
+
+        if (path == null || thresholdObj == null) return "UNKNOWN";
+
+        Object actual = navigatePath(metadata, path);
+        if (actual == null) return "UNKNOWN";
+
+        int count;
+        if (actual instanceof java.util.Collection) {
+            count = ((java.util.Collection<?>) actual).size();
+        } else if (actual instanceof Map) {
+            count = ((Map<?, ?>) actual).size();
+        } else if (actual instanceof Number) {
+            count = ((Number) actual).intValue();
+        } else {
+            return "UNKNOWN";
+        }
+
+        double threshold = ((Number) thresholdObj).doubleValue();
+        boolean triggered = "below".equals(direction)
+                ? count < threshold
+                : count > threshold;
+        return triggered ? severityToFindingStatus(defaultSeverity) : "OK";
+    }
+
+    /**
+     * Multi-path check: verifies multiple conditions (AND logic). All must pass for OK.
+     * Condition: {"type": "multi_path_check", "checks": [{"path": "...", "operator": "...", "expected": ...}, ...]}
+     */
+    @SuppressWarnings("unchecked")
+    private String evaluateMultiPathCheck(Map<String, Object> condition,
+                                           Map<String, Object> metadata,
+                                           String defaultSeverity) {
+        Object checksObj = condition.get("checks");
+        if (!(checksObj instanceof java.util.List)) return "UNKNOWN";
+
+        java.util.List<Map<String, Object>> checks = (java.util.List<Map<String, Object>>) checksObj;
+        if (checks.isEmpty()) return "UNKNOWN";
+
+        for (Map<String, Object> check : checks) {
+            String path = (String) check.get("path");
+            String operator = (String) check.get("operator");
+            Object expected = check.get("expected");
+
+            if (path == null || operator == null) return "UNKNOWN";
+
+            Object actual = navigatePath(metadata, path);
+            if (actual == null) {
+                return severityToFindingStatus(defaultSeverity);
+            }
+            if (!evaluateOperator(operator, actual, expected)) {
+                return severityToFindingStatus(defaultSeverity);
+            }
+        }
+        return "OK";
     }
 
     private String severityToFindingStatus(String severity) {

@@ -5,7 +5,7 @@ import api from '@/lib/api'
 import {
   LayoutDashboard, Server, Ticket, Users, Bell, LogOut,
   Building2, Shield, Award, FileText, Settings, Menu, X, ChevronRight,
-  Search, Download
+  Search, Download, Globe
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   'licenses': 'Licenses',
   'recommendations': 'Recommendations',
   'rules': 'Audit Rules',
+  'fleet': 'Fleet Overview',
   'bundles': 'Bundle',
 }
 
@@ -49,6 +50,7 @@ export default function Layout() {
     { to: '/operator/licenses', label: 'Licenses', icon: Award },
     { to: '/operator/recommendations', label: 'Recommendations', icon: FileText },
     { to: '/operator/rules', label: 'Audit Rules', icon: Settings },
+    { to: '/operator/fleet', label: 'Fleet Overview', icon: Globe },
   ]
 
   // Build breadcrumbs from path

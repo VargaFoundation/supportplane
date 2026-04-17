@@ -297,6 +297,101 @@ class RecommendationEngineServiceTest {
         assertEquals("CRITICAL", engine.evaluateRule(rule, metadata));
     }
 
+    // --- count_check tests ---
+
+    @Test
+    void evaluateRule_countCheck_listBelow() {
+        RecommendationRule rule = RecommendationRule.builder()
+                .defaultSeverity("WARNING")
+                .condition(Map.of(
+                        "type", "count_check",
+                        "path", "topology.hosts",
+                        "threshold", 3,
+                        "direction", "below"
+                ))
+                .build();
+
+        Map<String, Object> metadata = Map.of("topology",
+                Map.of("hosts", java.util.List.of(Map.of("h", "a"), Map.of("h", "b"))));
+
+        assertEquals("WARNING", engine.evaluateRule(rule, metadata));
+    }
+
+    @Test
+    void evaluateRule_countCheck_listAbove() {
+        RecommendationRule rule = RecommendationRule.builder()
+                .defaultSeverity("WARNING")
+                .condition(Map.of(
+                        "type", "count_check",
+                        "path", "topology.hosts",
+                        "threshold", 1,
+                        "direction", "below"
+                ))
+                .build();
+
+        Map<String, Object> metadata = Map.of("topology",
+                Map.of("hosts", java.util.List.of(Map.of("h", "a"), Map.of("h", "b"), Map.of("h", "c"))));
+
+        assertEquals("OK", engine.evaluateRule(rule, metadata));
+    }
+
+    // --- multi_path_check tests ---
+
+    @Test
+    void evaluateRule_multiPathCheck_allPass() {
+        RecommendationRule rule = RecommendationRule.builder()
+                .defaultSeverity("CRITICAL")
+                .condition(Map.of(
+                        "type", "multi_path_check",
+                        "checks", java.util.List.of(
+                                Map.of("path", "security.kerberos.enabled", "operator", "equals", "expected", true),
+                                Map.of("path", "security.ranger.enabled", "operator", "equals", "expected", true)
+                        )
+                ))
+                .build();
+
+        Map<String, Object> metadata = Map.of("security",
+                Map.of("kerberos", Map.of("enabled", true), "ranger", Map.of("enabled", true)));
+
+        assertEquals("OK", engine.evaluateRule(rule, metadata));
+    }
+
+    @Test
+    void evaluateRule_multiPathCheck_oneFails() {
+        RecommendationRule rule = RecommendationRule.builder()
+                .defaultSeverity("CRITICAL")
+                .condition(Map.of(
+                        "type", "multi_path_check",
+                        "checks", java.util.List.of(
+                                Map.of("path", "security.kerberos.enabled", "operator", "equals", "expected", true),
+                                Map.of("path", "security.ranger.enabled", "operator", "equals", "expected", true)
+                        )
+                ))
+                .build();
+
+        Map<String, Object> metadata = Map.of("security",
+                Map.of("kerberos", Map.of("enabled", true), "ranger", Map.of("enabled", false)));
+
+        assertEquals("CRITICAL", engine.evaluateRule(rule, metadata));
+    }
+
+    @Test
+    void evaluateRule_multiPathCheck_pathMissing() {
+        RecommendationRule rule = RecommendationRule.builder()
+                .defaultSeverity("WARNING")
+                .condition(Map.of(
+                        "type", "multi_path_check",
+                        "checks", java.util.List.of(
+                                Map.of("path", "security.kerberos.enabled", "operator", "equals", "expected", true)
+                        )
+                ))
+                .build();
+
+        Map<String, Object> metadata = Map.of("security", Map.of());
+
+        assertEquals("WARNING", engine.evaluateRule(rule, metadata));
+    }
+
     // --- calculateRisk tests ---
 
     @Test

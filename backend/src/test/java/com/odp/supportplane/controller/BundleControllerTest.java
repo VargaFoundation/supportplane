@@ -43,7 +43,7 @@ class BundleControllerTest {
     void uploadBundle_success() throws Exception {
         Bundle bundle = Bundle.builder()
                 .id(1L).bundleId("b-001").filename("bundle.zip").sizeBytes(1024L).build();
-        when(bundleService.receiveBundle(any(), eq("b-001"), eq("cl-001"), isNull()))
+        when(bundleService.receiveBundle(any(), eq("b-001"), eq("cl-001"), isNull(), any()))
                 .thenReturn(bundle);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -95,7 +95,7 @@ class BundleControllerTest {
         when(clusterService.validateOtp("cl-001", "123456")).thenReturn(true);
         Bundle bundle = Bundle.builder()
                 .id(1L).bundleId("b-002").filename("bundle.zip").sizeBytes(2048L).build();
-        when(bundleService.receiveBundle(any(), eq("b-002"), eq("cl-001"), eq("123456")))
+        when(bundleService.receiveBundle(any(), eq("b-002"), eq("cl-001"), eq("123456"), any()))
                 .thenReturn(bundle);
 
         MockMultipartFile file = new MockMultipartFile(
@@ -118,7 +118,7 @@ class BundleControllerTest {
         // Bundle upload is a public endpoint (no JWT required)
         Bundle bundle = Bundle.builder()
                 .id(1L).bundleId("b-003").filename("bundle.zip").sizeBytes(512L).build();
-        when(bundleService.receiveBundle(any(), eq("b-003"), eq("cl-001"), isNull()))
+        when(bundleService.receiveBundle(any(), eq("b-003"), eq("cl-001"), isNull(), any()))
                 .thenReturn(bundle);
 
         MockMultipartFile file = new MockMultipartFile(

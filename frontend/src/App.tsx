@@ -17,6 +17,7 @@ import TenantsPage from '@/pages/operator/TenantsPage'
 import LicensesPage from '@/pages/operator/LicensesPage'
 import RecommendationsPage from '@/pages/operator/RecommendationsPage'
 import RulesPage from '@/pages/operator/RulesPage'
+import FleetDashboard from '@/pages/operator/FleetDashboard'
 import ClusterArchitecturePage from '@/pages/clusters/ClusterArchitecturePage'
 import AuditReportPage from '@/pages/clusters/AuditReportPage'
 
@@ -48,6 +49,7 @@ export default function App() {
         <Route path="operator/licenses" element={<LicensesPage />} />
         <Route path="operator/recommendations" element={<RecommendationsPage />} />
         <Route path="operator/rules" element={<RulesPage />} />
+        <Route path="operator/fleet" element={<FleetDashboard />} />
       </Route>
     </Routes>
   )

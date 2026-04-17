@@ -32,7 +32,8 @@ public class BundleController {
             @RequestParam("bundle") MultipartFile file,
             @RequestHeader(value = "X-ODPSC-Bundle-ID", required = false) String bundleId,
             @RequestHeader(value = "X-ODPSC-Cluster-ID", required = false) String clusterId,
-            @RequestHeader(value = "X-ODPSC-Attachment-OTP", required = false) String attachmentOtp) {
+            @RequestHeader(value = "X-ODPSC-Attachment-OTP", required = false) String attachmentOtp,
+            jakarta.servlet.http.HttpServletRequest request) {
 
         if (bundleId == null || bundleId.isBlank()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing X-ODPSC-Bundle-ID header"));
@@ -43,7 +44,15 @@ public class BundleController {
             clusterService.validateOtp(clusterId, attachmentOtp);
         }
 
-        Bundle bundle = bundleService.receiveBundle(file, bundleId, clusterId, attachmentOtp);
+        // Extract source IP (consider X-Forwarded-For for proxied requests)
+        String sourceIp = request.getHeader("X-Forwarded-For");
+        if (sourceIp == null || sourceIp.isBlank()) {
+            sourceIp = request.getRemoteAddr();
+        } else {
+            sourceIp = sourceIp.split(",")[0].trim();
+        }
+
+        Bundle bundle = bundleService.receiveBundle(file, bundleId, clusterId, attachmentOtp, sourceIp);
         return ResponseEntity.ok(Map.of(
                 "status", "received",
                 "bundle_id", bundle.getBundleId(),

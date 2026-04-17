@@ -28,19 +28,42 @@ public class BundleService {
     private final ClusterRepository clusterRepository;
     private final BundleParsingService bundleParsingService;
     private final NotificationDispatcher notificationDispatcher;
+    private final GeoIpService geoIpService;
 
     @Value("${app.bundle-storage-path:/var/lib/supportplane/bundles}")
     private String storagePath;
 
     @Transactional
     public Bundle receiveBundle(MultipartFile file, String bundleId, String clusterId,
-                                 String attachmentOtp) {
+                                 String attachmentOtp, String sourceIp) {
         if (bundleRepository.existsByBundleId(bundleId)) {
             return bundleRepository.findByBundleId(bundleId).orElse(null);
         }
 
-        Optional<Cluster> clusterOpt = clusterRepository.findByClusterId(clusterId);
-        Cluster cluster = clusterOpt.orElse(null);
+        // Auto-discover cluster: if cluster_id is provided but doesn't exist, create an orphan
+        Cluster cluster = null;
+        if (clusterId != null && !clusterId.isBlank()) {
+            cluster = clusterRepository.findByClusterId(clusterId).orElse(null);
+            if (cluster == null) {
+                cluster = Cluster.builder()
+                        .clusterId(clusterId)
+                        .name(clusterId)
+                        .status("DISCOVERED")
+                        .tenant(null)
+                        .sourceIp(sourceIp)
+                        .build();
+                cluster = clusterRepository.save(cluster);
+                log.info("Auto-discovered new cluster: {} from IP {}", clusterId, sourceIp);
+            }
+        }
+
+        // Update source IP and geo on every bundle (IP may change)
+        if (cluster != null && sourceIp != null) {
+            cluster.setSourceIp(sourceIp);
+            if (cluster.getGeoLocation() == null || cluster.getGeoLocation().isBlank()) {
+                cluster.setGeoLocation(geoIpService.lookup(sourceIp));
+            }
+        }
 
         // Save file to disk
         String filename = file.getOriginalFilename();
@@ -75,12 +98,19 @@ public class BundleService {
             }
         }
 
-        log.info("Bundle received: {} (cluster: {}, size: {} bytes)", bundleId, clusterId, file.getSize());
+        log.info("Bundle received: {} (cluster: {}, ip: {}, size: {} bytes)", bundleId, clusterId, sourceIp, file.getSize());
 
         // Parse bundle contents to extract metadata
         bundleParsingService.parseBundle(bundle);
 
         return bundle;
+    }
+
+    // Backward compatible overload
+    @Transactional
+    public Bundle receiveBundle(MultipartFile file, String bundleId, String clusterId,
+                                 String attachmentOtp) {
+        return receiveBundle(file, bundleId, clusterId, attachmentOtp, null);
     }
 
     public List<Bundle> getBundlesForCluster(Long clusterId) {

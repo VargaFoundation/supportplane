@@ -38,6 +38,12 @@ public class Cluster {
     @JdbcTypeCode(SqlTypes.JSON)
     private Map<String, Object> metadata;
 
+    @Column(name = "source_ip")
+    private String sourceIp;
+
+    @Column(name = "geo_location")
+    private String geoLocation;
+
     @Column(name = "created_at")
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
