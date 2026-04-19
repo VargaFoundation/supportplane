@@ -1,5 +1,6 @@
 package com.odp.supportplane.service;
 
+import com.odp.supportplane.config.AccessControl;
 import com.odp.supportplane.config.TenantContext;
 import com.odp.supportplane.model.Notification;
 import com.odp.supportplane.model.Tenant;
@@ -27,6 +28,7 @@ public class NotificationService {
 
     @Transactional
     public Notification create(String type, String channel, Map<String, Object> config) {
+        AccessControl.requireAdminOrOperator();
         Tenant tenant = getCurrentTenant();
 
         Notification notification = Notification.builder()
