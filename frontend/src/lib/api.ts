@@ -61,7 +61,7 @@ api.interceptors.response.use(
 
         const newToken = data.accessToken
         const newRefresh = data.refreshToken || refreshToken
-        useAuthStore.getState().login(newToken, newRefresh, tenantId, useAuthStore.getState().role || undefined)
+        useAuthStore.getState().login(newToken, newRefresh, tenantId, data.role || useAuthStore.getState().role || undefined)
 
         isRefreshing = false
         onRefreshed(newToken)

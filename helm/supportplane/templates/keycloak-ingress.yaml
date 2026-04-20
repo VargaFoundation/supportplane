@@ -1,0 +1,34 @@
+{{- if and .Values.keycloak.enabled .Values.keycloak.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "supportplane.fullname" . }}-keycloak
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+  {{- with .Values.keycloak.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if .Values.keycloak.ingress.className }}
+  ingressClassName: {{ .Values.keycloak.ingress.className }}
+  {{- end }}
+  {{- if .Values.keycloak.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.keycloak.ingress.host | quote }}
+      secretName: {{ .Values.keycloak.ingress.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.keycloak.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "supportplane.fullname" . }}-keycloak
+                port:
+                  number: 8080
+{{- end }}

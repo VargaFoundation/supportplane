@@ -20,6 +20,8 @@ import RulesPage from '@/pages/operator/RulesPage'
 import FleetDashboard from '@/pages/operator/FleetDashboard'
 import ClusterArchitecturePage from '@/pages/clusters/ClusterArchitecturePage'
 import AuditReportPage from '@/pages/clusters/AuditReportPage'
+import AIInsightsPage from '@/pages/clusters/AIInsightsPage'
+import AuditPage from '@/pages/admin/AuditPage'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
@@ -38,11 +40,13 @@ export default function App() {
         <Route path="clusters/:id" element={<ClusterDetailPage />} />
         <Route path="clusters/:id/audit" element={<ClusterArchitecturePage />} />
         <Route path="clusters/:id/audit-report" element={<AuditReportPage />} />
+        <Route path="clusters/:id/ai-insights" element={<AIInsightsPage />} />
         <Route path="tickets" element={<TicketsPage />} />
         <Route path="tickets/:id" element={<TicketDetailPage />} />
         <Route path="bundles/:id" element={<BundleViewerPage />} />
         <Route path="admin/users" element={<UsersPage />} />
         <Route path="admin/notifications" element={<NotificationsPage />} />
+        <Route path="admin/audit" element={<AuditPage />} />
         <Route path="operator" element={<OperatorDashboard />} />
         <Route path="operator/clusters" element={<AllClustersPage />} />
         <Route path="operator/tenants" element={<TenantsPage />} />

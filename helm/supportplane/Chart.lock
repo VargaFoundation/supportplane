@@ -1,0 +1,15 @@
+dependencies:
+- name: clickhouse
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 9.4.4
+- name: loki
+  repository: https://grafana.github.io/helm-charts
+  version: 6.10.0
+- name: grafana
+  repository: https://grafana.github.io/helm-charts
+  version: 8.4.0
+- name: pulsar
+  repository: https://pulsar.apache.org/charts
+  version: 3.5.0
+digest: sha256:41ffa3264d4afc8f64e55aadeb8aea61cc6319806053c8f54f91af2375d61911
+generated: "2026-04-20T12:35:41.653736845+02:00"

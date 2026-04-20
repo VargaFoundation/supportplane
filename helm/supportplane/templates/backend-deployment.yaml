@@ -6,7 +6,14 @@ metadata:
     {{- include "supportplane.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
   replicas: {{ .Values.backend.replicas }}
+  {{- end }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       {{- include "supportplane.selectorLabels" . | nindent 6 }}
@@ -16,13 +23,33 @@ spec:
       labels:
         {{- include "supportplane.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: backend
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/backend-configmap.yaml") . | sha256sum }}
+        {{- with .Values.backend.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
     spec:
+      serviceAccountName: {{ include "supportplane.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
       containers:
         - name: backend
           image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
           imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop: ["ALL"]
           ports:
-            - containerPort: 8081
+            - name: http
+              containerPort: 8081
               protocol: TCP
           envFrom:
             - configMapRef:
@@ -31,31 +58,119 @@ spec:
             - name: SPRING_DATASOURCE_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: POSTGRES_USER
             - name: SPRING_DATASOURCE_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: POSTGRES_PASSWORD
+            - name: APP_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.secretName" . }}
+                  key: APP_ENCRYPTION_KEY
+            {{- if .Values.clickhouse.enabled }}
+            - name: CLICKHOUSE_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.secretName" . }}
+                  key: CLICKHOUSE_USER
+            - name: CLICKHOUSE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "supportplane.secretName" . }}
+                  key: CLICKHOUSE_PASSWORD
+            {{- end }}
+            {{- if and .Values.pulsar.enabled .Values.streaming.enabled }}
+            - name: PULSAR_ENABLED
+              value: "true"
+            - name: PULSAR_SERVICE_URL
+              value: {{ .Values.streaming.serviceUrl | quote }}
+            - name: PULSAR_ADMIN_URL
+              value: {{ .Values.streaming.adminUrl | quote }}
+            - name: PULSAR_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.streaming.backendToken.secretName }}
+                  key: {{ .Values.streaming.backendToken.secretKey }}
+            - name: PULSAR_JWT_PRIVATE_KEY_PATH
+              value: /pulsar/keys/jwt-private.pem
+            - name: PULSAR_JWT_TOKEN_TTL_DAYS
+              value: {{ .Values.streaming.jwt.tokenTtlDays | quote }}
+            {{- if .Values.streaming.caCert.enabled }}
+            - name: PULSAR_TLS_TRUST_CERTS
+              value: /pulsar/certs/ca.crt
+            {{- end }}
+            {{- end }}
+            {{- with .Values.backend.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           livenessProbe:
             httpGet:
-              path: /actuator/health
-              port: 8081
+              path: /actuator/health/liveness
+              port: http
             initialDelaySeconds: 60
-            periodSeconds: 15
+            periodSeconds: 20
+            failureThreshold: 5
           readinessProbe:
             httpGet:
-              path: /actuator/health
-              port: 8081
+              path: /actuator/health/readiness
+              port: http
             initialDelaySeconds: 30
             periodSeconds: 10
+            failureThreshold: 3
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
           resources:
             {{- toYaml .Values.backend.resources | nindent 12 }}
           volumeMounts:
             - name: bundle-storage
               mountPath: /var/lib/supportplane/bundles
+            {{- if and .Values.pulsar.enabled .Values.streaming.enabled }}
+            - name: pulsar-jwt
+              mountPath: /pulsar/keys
+              readOnly: true
+            {{- if .Values.streaming.caCert.enabled }}
+            - name: pulsar-ca
+              mountPath: /pulsar/certs
+              readOnly: true
+            {{- end }}
+            {{- end }}
       volumes:
         - name: bundle-storage
           persistentVolumeClaim:
             claimName: {{ include "supportplane.fullname" . }}-bundles
+        {{- if and .Values.pulsar.enabled .Values.streaming.enabled }}
+        - name: pulsar-jwt
+          secret:
+            secretName: {{ .Values.streaming.jwt.secretName }}
+            items:
+              - key: jwt-private.pem
+                path: jwt-private.pem
+        {{- if .Values.streaming.caCert.enabled }}
+        - name: pulsar-ca
+          secret:
+            secretName: {{ .Values.streaming.caCert.secretName }}
+            items:
+              - key: {{ .Values.streaming.caCert.secretKey }}
+                path: ca.crt
+        {{- end }}
+        {{- end }}
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

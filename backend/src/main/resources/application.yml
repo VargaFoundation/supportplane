@@ -38,6 +38,43 @@ app:
   cors:
     allowed-origins: http://localhost:3000,http://localhost:5173
 
+clickhouse:
+  url: ${CLICKHOUSE_URL:jdbc:ch://localhost:8123/supportplane}
+  username: ${CLICKHOUSE_USER:supportplane}
+  password: ${CLICKHOUSE_PASSWORD:}
+  enabled: ${CLICKHOUSE_ENABLED:false}
+
+loki:
+  url: ${LOKI_URL:http://localhost:3100}
+  enabled: ${LOKI_ENABLED:false}
+
+pulsar:
+  enabled: ${PULSAR_ENABLED:false}
+  service-url: ${PULSAR_SERVICE_URL:pulsar://localhost:6650}
+  admin-url: ${PULSAR_ADMIN_URL:http://localhost:8082}
+  tenant: ${PULSAR_TENANT:supportplane}
+  default-namespace: ${PULSAR_DEFAULT_NAMESPACE:default}
+  producer:
+    batching-max-messages: 1000
+    batching-max-delay-ms: 10
+  consumer:
+    tenant-namespace: ${PULSAR_CONSUMER_NAMESPACE:default}
+    metrics-subscription: supportplane-metrics-ingest
+    logs-subscription: supportplane-logs-ingest
+  # Bearer token presented by the backend on its own client + admin connections.
+  # Empty in dev with auth disabled; populated from a K8s Secret in prod.
+  auth:
+    token: ${PULSAR_AUTH_TOKEN:}
+  # Path inside the container to the PEM-encoded CA cert that signs the
+  # broker / proxy server cert. Empty when TLS is off (legacy/dev).
+  tls:
+    trust-certs-file-path: ${PULSAR_TLS_TRUST_CERTS:}
+  # Per-tenant token issuance (TenantStreamingService — see ADR 0003).
+  jwt:
+    private-key-path: ${PULSAR_JWT_PRIVATE_KEY_PATH:}
+    issuer: ${PULSAR_JWT_ISSUER:supportplane}
+    token-ttl-days: ${PULSAR_JWT_TOKEN_TTL_DAYS:365}
+
 springdoc:
   api-docs:
     path: /api-docs

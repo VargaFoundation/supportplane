@@ -5,7 +5,7 @@ import api from '@/lib/api'
 import {
   LayoutDashboard, Server, Ticket, Users, Bell, LogOut,
   Building2, Shield, Award, FileText, Settings, Menu, X, ChevronRight,
-  Search, Download, Globe
+  Search, Download, Globe, History
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,6 +16,7 @@ const BREADCRUMB_LABELS: Record<string, string> = {
   'admin': 'Admin',
   'users': 'Users',
   'notifications': 'Notifications',
+  'audit': 'Activity Log',
   'operator': 'Operator',
   'tenants': 'Tenants',
   'licenses': 'Licenses',
@@ -41,6 +42,7 @@ export default function Layout() {
   const adminItems = [
     { to: '/admin/users', label: 'Users', icon: Users },
     { to: '/admin/notifications', label: 'Notifications', icon: Bell },
+    { to: '/admin/audit', label: 'Activity Log', icon: History },
   ]
 
   const operatorItems = [

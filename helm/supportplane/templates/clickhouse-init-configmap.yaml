@@ -1,0 +1,20 @@
+{{- if and .Values.clickhouse.enabled .Values.clickhouse.initSql.enabled }}
+# ConfigMap holding the SupportPlane ClickHouse schema. The bitnami/clickhouse
+# subchart executes scripts mounted under /docker-entrypoint-initdb.d on first
+# boot. Wire this into the subchart via:
+#
+#   clickhouse:
+#     initdbScriptsConfigMap: "{{ include "supportplane.fullname" . }}-clickhouse-init"
+#
+# (already set in values-observability.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supportplane.fullname" . }}-clickhouse-init
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: clickhouse-init
+data:
+  init.sql: |-
+{{ .Files.Get "files/clickhouse-init.sql" | indent 4 }}
+{{- end }}

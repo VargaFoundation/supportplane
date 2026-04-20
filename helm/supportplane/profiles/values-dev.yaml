@@ -1,0 +1,42 @@
+# ----------------------------------------------------------------------------
+# Dev profile: single-node k8s (kind/minikube/k3s), everything in-cluster.
+# No ingress, no TLS, keycloak in start-dev mode.
+#
+#   helm upgrade --install supportplane ./helm/supportplane \
+#       -f ./helm/supportplane/profiles/values-dev.yaml \
+#       -n supportplane --create-namespace
+# ----------------------------------------------------------------------------
+
+backend:
+  replicas: 1
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits:   { cpu: "1",  memory: 1Gi   }
+  pdb:
+    enabled: false
+  corsAllowedOrigins: "http://localhost:3000,http://localhost:5173"
+
+frontend:
+  replicas: 1
+  pdb:
+    enabled: false
+
+postgres:
+  enabled: true
+  storage:
+    size: 2Gi
+
+keycloak:
+  enabled: true
+  mode: dev
+  importRealms: true
+
+bundleStorage:
+  size: 2Gi
+  accessMode: ReadWriteOnce
+
+ingress:
+  enabled: false
+
+networkPolicy:
+  enabled: false

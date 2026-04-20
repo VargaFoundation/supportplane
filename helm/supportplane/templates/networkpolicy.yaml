@@ -1,0 +1,79 @@
+{{- if .Values.networkPolicy.enabled }}
+# Frontend: allow ingress from any source (ingress controller in another ns).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supportplane.fullname" . }}-frontend
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supportplane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: frontend
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - port: 80
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "supportplane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: backend
+      ports:
+        - port: 8081
+    # DNS
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - port: 53
+          protocol: UDP
+---
+# Backend: ingress only from frontend; egress to postgres, keycloak, optional infra.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "supportplane.fullname" . }}-backend
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "supportplane.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "supportplane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: frontend
+      ports:
+        - port: 8081
+    # Allow cluster ingress from ingress-nginx (namespace label) for direct /api access.
+    - from:
+        - namespaceSelector: {}
+      ports:
+        - port: 8081
+  egress:
+    # Postgres
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "supportplane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: postgres
+      ports:
+        - port: 5432
+    # Keycloak
+    - to:
+        - podSelector:
+            matchLabels:
+              {{- include "supportplane.selectorLabels" . | nindent 14 }}
+              app.kubernetes.io/component: keycloak
+      ports:
+        - port: 8080
+    # DNS + external (managed clusters, remote Keycloak, Pulsar brokers, etc.)
+    - to:
+        - namespaceSelector: {}
+{{- end }}

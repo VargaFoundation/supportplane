@@ -11,14 +11,17 @@
         <relativePath/>
     </parent>
 
-    <groupId>com.odp</groupId>
+    <groupId>varga</groupId>
     <artifactId>supportplane</artifactId>
     <version>1.0.0</version>
     <name>SupportPlane</name>
-    <description>SupportPlane - ODPSC cluster management platform</description>
+    <description>SupportPlane - Multi-tenant Hadoop/Big Data cluster audit platform</description>
 
     <properties>
         <java.version>17</java.version>
+        <clickhouse.version>0.6.0</clickhouse.version>
+        <pulsar.version>3.2.2</pulsar.version>
+        <jjwt.version>0.12.5</jjwt.version>
     </properties>
 
     <dependencies>
@@ -65,6 +68,54 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
+
+        <!-- ClickHouse JDBC for time-series metrics storage -->
+        <dependency>
+            <groupId>com.clickhouse</groupId>
+            <artifactId>clickhouse-jdbc</artifactId>
+            <version>${clickhouse.version}</version>
+            <classifier>all</classifier>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+        <!-- Apache Pulsar client for continuous streaming of metrics/logs -->
+        <dependency>
+            <groupId>org.apache.pulsar</groupId>
+            <artifactId>pulsar-client</artifactId>
+            <version>${pulsar.version}</version>
+        </dependency>
+
+        <!-- Pulsar admin client for namespace + ACL provisioning (TenantStreamingService) -->
+        <dependency>
+            <groupId>org.apache.pulsar</groupId>
+            <artifactId>pulsar-client-admin</artifactId>
+            <version>${pulsar.version}</version>
+        </dependency>
+
+        <!-- JWT (RS256) issuance for per-tenant Pulsar tokens — see ADR 0003 -->
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-api</artifactId>
+            <version>${jjwt.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-impl</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.jsonwebtoken</groupId>
+            <artifactId>jjwt-jackson</artifactId>
+            <version>${jjwt.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>

@@ -1,0 +1,86 @@
+# ----------------------------------------------------------------------------
+# Observability overlay: enables ClickHouse (metrics), Loki (logs), Grafana
+# (dashboards), and Apache Pulsar (streaming). Stack it on top of dev or prod:
+#
+#   helm upgrade --install supportplane ./helm/supportplane \
+#       -f ./helm/supportplane/profiles/values-prod.yaml \
+#       -f ./helm/supportplane/profiles/values-observability.yaml \
+#       -n supportplane --create-namespace
+#
+# Run `helm dependency update ./helm/supportplane` once before installing so
+# Helm pulls the subcharts into charts/.
+# ----------------------------------------------------------------------------
+
+clickhouse:
+  enabled: true
+  auth:
+    username: default
+    password: ""            # override via --set for any non-dev use
+  shards: 1
+  replicaCount: 2
+  persistence:
+    size: 50Gi
+  # Apply the SupportPlane schema on first boot. The ConfigMap is generated
+  # from /infra/clickhouse/init.sql by the umbrella chart; we tell the bitnami
+  # subchart to consume it.
+  initdbScriptsConfigMap: "RELEASE-NAME-supportplane-clickhouse-init"
+
+loki:
+  enabled: true
+  deploymentMode: SingleBinary
+  singleBinary:
+    replicas: 1
+    persistence:
+      size: 50Gi
+
+grafana:
+  enabled: true
+  adminPassword: "change-me"
+  persistence:
+    enabled: true
+    size: 10Gi
+  service:
+    type: ClusterIP
+  # Pre-installed data sources wired to the subchart services.
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          type: loki
+          access: proxy
+          url: http://{{ .Release.Name }}-loki:3100
+          isDefault: true
+        - name: ClickHouse
+          type: grafana-clickhouse-datasource
+          access: proxy
+          url: http://{{ .Release.Name }}-clickhouse:8123
+          jsonData:
+            defaultDatabase: supportplane
+            username: default
+            protocol: http
+
+pulsar:
+  enabled: true
+  components:
+    zookeeper: true
+    bookkeeper: true
+    autorecovery: false
+    broker: true
+    functions: false
+    proxy: false
+    toolset: true
+    pulsar_manager: false
+  monitoring:
+    prometheus: false
+    grafana: false
+    node_exporter: false
+    alert_manager: false
+  zookeeper:
+    replicaCount: 1
+  bookkeeper:
+    replicaCount: 1
+  broker:
+    replicaCount: 1
+  tenant: supportplane
+  defaultNamespace: default

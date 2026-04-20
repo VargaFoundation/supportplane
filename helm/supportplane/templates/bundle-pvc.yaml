@@ -6,7 +6,7 @@ metadata:
     {{- include "supportplane.labels" . | nindent 4 }}
 spec:
   accessModes:
-    - ReadWriteOnce
+    - {{ .Values.bundleStorage.accessMode | default "ReadWriteOnce" }}
   {{- if .Values.bundleStorage.storageClassName }}
   storageClassName: {{ .Values.bundleStorage.storageClassName }}
   {{- end }}

@@ -46,8 +46,21 @@ services:
       KEYCLOAK_AUTH_SERVER_URL: http://keycloak:8080
       KEYCLOAK_CLIENTS_REALM: clients
       KEYCLOAK_SUPPORT_REALM: support
+      # Streaming (opt-in) — populated from .env, see .env.example.
+      PULSAR_ENABLED: ${PULSAR_ENABLED:-false}
+      PULSAR_SERVICE_URL: ${PULSAR_SERVICE_URL:-}
+      PULSAR_ADMIN_URL: ${PULSAR_ADMIN_URL:-}
+      PULSAR_AUTH_TOKEN: ${PULSAR_AUTH_TOKEN:-}
+      PULSAR_TLS_TRUST_CERTS: ${PULSAR_TLS_TRUST_CERTS:-}
+      PULSAR_JWT_PRIVATE_KEY_PATH: ${PULSAR_JWT_PRIVATE_KEY_PATH:-}
     ports:
       - "8081:8081"
+    volumes:
+      # Read-only mounts of the Pulsar keys/certs volumes provisioned by
+      # docker-compose.infra.yml's pulsar-init sidecar. Only used when
+      # PULSAR_ENABLED=true; harmless otherwise.
+      - pulsar-keys:/pulsar/keys:ro
+      - pulsar-certs:/pulsar/certs:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,3 +76,12 @@ services:
 
 volumes:
   pgdata:
+  # Provisioned by docker-compose.infra.yml's pulsar-init sidecar. Declared
+  # external so docker-compose doesn't try to recreate them when this file
+  # is used standalone (without the infra stack).
+  pulsar-keys:
+    external: true
+    name: supportplane_pulsar-keys
+  pulsar-certs:
+    external: true
+    name: supportplane_pulsar-certs

@@ -35,7 +35,7 @@ export default function NotificationsPage() {
     const config: Record<string, string> = {}
     if (channel === 'EMAIL') config.email = target
     else if (channel === 'WEBHOOK') config.url = target
-    else if (channel === 'SLACK') config.webhookUrl = target
+    else if (channel === 'SLACK') config.url = target
     createMutation.mutate({ type, channel, config })
   }
 

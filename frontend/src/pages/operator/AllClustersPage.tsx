@@ -38,7 +38,7 @@ export default function AllClustersPage() {
           />
         </div>
         <div className="flex gap-1">
-          {['ALL', 'ACTIVE', 'PENDING', 'DETACHED'].map((s) => (
+          {['ALL', 'DISCOVERED', 'ACTIVE', 'PENDING', 'DETACHED'].map((s) => (
             <button
               key={s}
               onClick={() => setStatusFilter(s)}

@@ -1,9 +1,40 @@
+# ============================================================================
+# SupportPlane umbrella chart — default values
+# ----------------------------------------------------------------------------
+# This file documents every tunable. See values-dev.yaml / values-prod.yaml /
+# values-observability.yaml for opinionated profiles.
+# ============================================================================
+
+# -- Override the chart name (normally left empty).
+nameOverride: ""
+# -- Fully override the generated fullname prefix (normally left empty).
+fullnameOverride: ""
+
+# ----------------------------------------------------------------------------
+# Image pull secrets for private registries
+# ----------------------------------------------------------------------------
+imagePullSecrets: []
+  # - name: regcred
+
+# ----------------------------------------------------------------------------
+# Service account
+# ----------------------------------------------------------------------------
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# ============================================================================
+# Backend (Spring Boot, port 8081)
+# ============================================================================
 backend:
   image:
     repository: supportplane/backend
     tag: latest
     pullPolicy: IfNotPresent
-  replicas: 1
+  replicas: 2
+  service:
+    port: 8081
   resources:
     requests:
       cpu: 250m
@@ -11,15 +42,37 @@ backend:
     limits:
       cpu: "1"
       memory: 1Gi
-  service:
-    port: 8081
+  # Extra environment variables injected as-is into the backend container.
+  extraEnv: []
+    # - name: LOG_LEVEL
+    #   value: INFO
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 75
+  pdb:
+    enabled: true
+    minAvailable: 1
+  # Optional internal CORS origin list — set to the public URL(s) the SPA
+  # is served from. Comma-separated.
+  corsAllowedOrigins: ""
 
+# ============================================================================
+# Frontend (React + nginx, port 80)
+# ============================================================================
 frontend:
   image:
     repository: supportplane/frontend
     tag: latest
     pullPolicy: IfNotPresent
-  replicas: 1
+  replicas: 2
+  service:
+    port: 80
   resources:
     requests:
       cpu: 100m
@@ -27,14 +80,28 @@ frontend:
     limits:
       cpu: 500m
       memory: 256Mi
-  service:
-    port: 80
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
 
+# ============================================================================
+# PostgreSQL (in-chart StatefulSet — set enabled=false to use external DB)
+# ============================================================================
 postgres:
   enabled: true
   image:
     repository: postgres
     tag: "15"
+    pullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 250m
@@ -45,12 +112,33 @@ postgres:
   storage:
     size: 10Gi
     storageClassName: ""
+  # When postgres.enabled=false, the backend and keycloak will connect here.
+  external:
+    host: ""
+    port: 5432
 
+# ============================================================================
+# Keycloak
+# ============================================================================
 keycloak:
   enabled: true
   image:
     repository: quay.io/keycloak/keycloak
     tag: "24.0"
+    pullPolicy: IfNotPresent
+  # dev: uses `start-dev` (no HTTPS required, no hostname). Use only for non-prod.
+  # prod: uses `start --optimized` with proxy=edge and hostname from values.
+  mode: dev
+  # Hostname Keycloak will advertise in issued tokens. Required when mode=prod.
+  hostname: ""
+  # Additional Keycloak CLI args (appended after mode command).
+  extraArgs: []
+  # Mount the two realm exports (clients + support) as a ConfigMap and import them
+  # on first boot (-- import-realm). When using an external Keycloak this is ignored.
+  importRealms: true
+  # Mount the custom login theme (keycloak/themes/supportplane) as a ConfigMap.
+  # For production images you typically bake the theme into a custom image instead.
+  mountCustomTheme: false
   resources:
     requests:
       cpu: 250m
@@ -58,8 +146,29 @@ keycloak:
     limits:
       cpu: "1"
       memory: 1Gi
+  # Realm names expected by the backend.
+  realms:
+    clients: clients
+    support: support
+  # Ingress for Keycloak (separate from the application ingress). Optional.
+  ingress:
+    enabled: false
+    className: ""
+    host: keycloak.example.com
+    tls:
+      enabled: false
+      secretName: ""
+    annotations: {}
 
+# ============================================================================
+# Secrets (plain values). For production, set these via --set or use an external
+# secret operator (ExternalSecrets / Sealed Secrets) and set existingSecret.
+# ============================================================================
 secrets:
+  # Use an existing Secret instead of generating one from values below.
+  # The secret must contain keys: POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD,
+  # KEYCLOAK_ADMIN, KEYCLOAK_ADMIN_PASSWORD, APP_ENCRYPTION_KEY.
+  existingSecret: ""
   postgres:
     database: supportplane
     username: supportplane
@@ -67,11 +176,23 @@ secrets:
   keycloak:
     adminUsername: admin
     adminPassword: admin
+  # 32-char base64 key used by the backend to encrypt agent credentials at rest.
+  # Change this for any deployment that leaves localhost.
+  appEncryptionKey: "ZGV2LWVuY3J5cHRpb24ta2V5LWNoYW5nZS1mb3ItcHJvZA=="
 
+# ============================================================================
+# Bundle storage (PVC for uploaded support bundles — backend writes here).
+# ============================================================================
 bundleStorage:
   size: 20Gi
   storageClassName: ""
+  # ReadWriteMany allows multiple backend replicas to share storage. If your
+  # cluster has no RWX storage class, pin backend.replicas=1 and use RWO.
+  accessMode: ReadWriteOnce
 
+# ============================================================================
+# Ingress for the application (frontend + /api → backend)
+# ============================================================================
 ingress:
   enabled: false
   className: ""
@@ -86,3 +207,234 @@ ingress:
           pathType: Prefix
           backend: frontend
   tls: []
+  # Example TLS entry (requires cert-manager or a pre-created secret):
+  #   - hosts:
+  #       - supportplane.example.com
+  #     secretName: supportplane-tls
+
+# ============================================================================
+# Network policies — restrict traffic inside the namespace.
+# ============================================================================
+networkPolicy:
+  enabled: false
+
+# ============================================================================
+# Observability / analytics stack (optional subcharts).
+# Each is disabled by default — enable selectively with values-observability.yaml.
+# When enabled, the backend is automatically wired to the subchart services.
+# ============================================================================
+
+# ---- ClickHouse (bitnami chart) ---------------------------------------------
+clickhouse:
+  enabled: false
+  # When enabled, this flips the backend CLICKHOUSE_ENABLED flag too.
+  auth:
+    username: default
+    password: clickhouse
+  shards: 1
+  replicaCount: 1
+  persistence:
+    size: 20Gi
+  # Apply /infra/clickhouse/init.sql on first boot via a ConfigMap mount.
+  initSql:
+    enabled: true
+
+# ---- Loki (grafana chart) ---------------------------------------------------
+loki:
+  enabled: false
+  # We deploy Loki in single-binary mode (SingleBinary) for simplicity.
+  deploymentMode: SingleBinary
+  loki:
+    auth_enabled: false
+    commonConfig:
+      replication_factor: 1
+    schemaConfig:
+      configs:
+        - from: "2024-01-01"
+          store: tsdb
+          object_store: filesystem
+          schema: v13
+          index:
+            prefix: loki_index_
+            period: 24h
+    storage:
+      type: filesystem
+  singleBinary:
+    replicas: 1
+    persistence:
+      size: 20Gi
+  # These subchart components are not needed in SingleBinary mode — disable
+  # them so `helm template` does not emit their manifests.
+  read:
+    replicas: 0
+  write:
+    replicas: 0
+  backend:
+    replicas: 0
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+  gateway:
+    enabled: false
+  test:
+    enabled: false
+  lokiCanary:
+    enabled: false
+  monitoring:
+    selfMonitoring:
+      enabled: false
+      grafanaAgent:
+        installOperator: false
+    lokiCanary:
+      enabled: false
+
+# ---- Grafana (grafana chart) ------------------------------------------------
+grafana:
+  enabled: false
+  adminUser: admin
+  adminPassword: admin
+  persistence:
+    enabled: true
+    size: 10Gi
+  # Pre-wire Loki and ClickHouse datasources so the dashboards work out of the box.
+  datasources:
+    datasources.yaml:
+      apiVersion: 1
+      datasources:
+        - name: Loki
+          type: loki
+          url: http://{{ .Release.Name }}-loki:3100
+          access: proxy
+          isDefault: false
+        - name: ClickHouse
+          type: grafana-clickhouse-datasource
+          url: http://{{ .Release.Name }}-clickhouse:8123
+          access: proxy
+          jsonData:
+            defaultDatabase: supportplane
+            username: default
+            protocol: http
+  service:
+    type: ClusterIP
+
+# ---- Apache Pulsar (apache chart) -------------------------------------------
+# Pulsar is heavy — only enable when the project explicitly opts in to streaming.
+# Security architecture: see docs/adr/0003-pulsar-security.md.
+pulsar:
+  enabled: false
+  # Minimal-footprint profile intended for small/test clusters. Production
+  # deployments should tune BookKeeper/ZooKeeper sizing separately.
+  initialize: true
+  components:
+    zookeeper: true
+    bookkeeper: true
+    autorecovery: false
+    broker: true
+    functions: false
+    # The proxy is the only Pulsar component meant to be reachable from
+    # outside the K8s cluster. Customer agents connect to it over TLS;
+    # brokers + bookies + ZK stay private.
+    proxy: true
+    toolset: true
+    pulsar_manager: false
+  monitoring:
+    prometheus: false
+    grafana: false
+    node_exporter: false
+    alert_manager: false
+  zookeeper:
+    replicaCount: 1
+  bookkeeper:
+    replicaCount: 1
+  broker:
+    replicaCount: 1
+    configData:
+      # Mirror the standalone overrides used in dev (infra/pulsar/conf/standalone.conf).
+      authenticationEnabled: "true"
+      authenticationProviders: "org.apache.pulsar.broker.authentication.AuthenticationProviderToken"
+      authorizationEnabled: "true"
+      superUserRoles: "supportplane-backend,supportplane-proxy"
+      proxyRoles: "supportplane-proxy"
+  proxy:
+    replicaCount: 2
+    service:
+      type: LoadBalancer
+    configData:
+      authenticationEnabled: "true"
+      authenticationProviders: "org.apache.pulsar.broker.authentication.AuthenticationProviderToken"
+      authorizationEnabled: "true"
+      forwardAuthorizationCredentials: "true"
+  # Authentication / authorization. The upstream chart consumes these keys
+  # to mount the JWT public key into broker + proxy and propagate the
+  # superuser token to internal components.
+  auth:
+    authentication:
+      enabled: true
+      provider: "jwt"
+      jwt:
+        # Asymmetric (RS256) — the SupportPlane backend holds the private
+        # key and signs per-tenant tokens. Brokers + proxy only see the
+        # public key, so a broker compromise does not enable token forgery.
+        usingSecretKey: false
+    authorization:
+      enabled: true
+    superUsers:
+      broker: "supportplane-backend"
+      proxy: "supportplane-proxy"
+      client: "supportplane-backend"
+  # Backend wiring: the tenant/namespace must exist before the backend publishes.
+  tenant: supportplane
+  defaultNamespace: default
+
+# ---- SupportPlane streaming security (Pulsar-side, backend wiring) ----------
+# These keys are consumed by SupportPlane-specific templates
+# (templates/pulsar-jwt-secret.yaml, templates/backend-deployment.yaml).
+# They reference the same JWT keypair the upstream chart consumes via
+# `pulsar.auth.authentication.jwt`.
+streaming:
+  # When pulsar.enabled=true, the backend container is wired with the env
+  # vars below so it can talk to the proxy and mint per-tenant tokens.
+  enabled: false
+
+  # External URL announced to customer agents. Must point at the Pulsar
+  # Proxy LoadBalancer Service (or its public DNS).
+  serviceUrl: pulsar+ssl://pulsar-proxy.supportplane.example.com:6651
+  adminUrl: https://pulsar-proxy.supportplane.example.com:8443
+
+  # JWT keypair used by both the upstream Pulsar chart (public key into
+  # broker+proxy) and the SupportPlane backend (private key for signing).
+  jwt:
+    # When createSecret=true the chart provisions the Secret from the
+    # base64 blobs below. Recommended for dev/staging only — in production
+    # provide an externally-managed Secret (e.g. ExternalSecrets / Vault)
+    # and set createSecret=false + secretName=<existing>.
+    createSecret: false
+    secretName: pulsar-jwt-keys
+    publicKeyB64: ""
+    privateKeyB64: ""
+    # Issued tokens expire after this many days. The backend re-issues on
+    # demand via POST /api/v1/tenants/{id}/streaming/rotate-token.
+    tokenTtlDays: 365
+
+  # Bearer token used by the backend to authenticate against Pulsar (broker
+  # client + admin REST). Subject must match `pulsar.auth.superUsers.client`.
+  # Mint with: pulsar tokens create --private-key file://jwt-private.pem \
+  #                                  --subject supportplane-backend
+  backendToken:
+    # Set to true to have the chart create the Secret from inline value
+    # (dev only). Otherwise reference an existing Secret.
+    createSecret: false
+    secretName: pulsar-backend-token
+    secretKey: token
+    valueB64: ""
+
+  # PEM-encoded CA cert used by the backend to verify the proxy's TLS cert.
+  # When the proxy uses cert-manager with a public ACME issuer, this can be
+  # left empty (the JVM trust store is enough).
+  caCert:
+    # Set to true to mount our own CA cert from the Secret below; false to
+    # rely on the system trust store.
+    enabled: false
+    secretName: pulsar-proxy-ca
+    secretKey: ca.crt

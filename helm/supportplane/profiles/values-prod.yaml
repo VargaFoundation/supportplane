@@ -1,0 +1,104 @@
+# ----------------------------------------------------------------------------
+# Production profile: HA where possible, ingress + TLS via cert-manager,
+# Keycloak in production mode, NetworkPolicies on.
+#
+# Before installing:
+#   1. Install ingress-nginx and cert-manager (see docs/deploy/kubernetes.md).
+#   2. Create a ClusterIssuer named "letsencrypt-prod" (or change the annotation).
+#   3. Create the Secret with real passwords and pass it via secrets.existingSecret,
+#      OR override values below with --set.
+#
+#   helm upgrade --install supportplane ./helm/supportplane \
+#       -f ./helm/supportplane/profiles/values-prod.yaml \
+#       --set secrets.existingSecret=supportplane-secrets \
+#       -n supportplane --create-namespace
+# ----------------------------------------------------------------------------
+
+backend:
+  replicas: 3
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: "2",  memory: 2Gi }
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 8
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    enabled: true
+    minAvailable: 2
+  # Set this to the public URL(s) the SPA is served from.
+  corsAllowedOrigins: "https://supportplane.example.com"
+
+frontend:
+  replicas: 3
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits:   { cpu: 500m, memory: 256Mi }
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 6
+  pdb:
+    enabled: true
+    minAvailable: 2
+
+postgres:
+  # Recommended: run a managed DB (RDS/Cloud SQL) and disable the in-chart StatefulSet.
+  enabled: true
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: "2",  memory: 4Gi }
+  storage:
+    size: 50Gi
+    storageClassName: ""    # set to your cluster's SSD class (e.g. gp3, premium-rwo)
+
+keycloak:
+  enabled: true
+  mode: prod
+  hostname: "keycloak.example.com"
+  importRealms: true
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits:   { cpu: "2",  memory: 2Gi }
+  ingress:
+    enabled: true
+    className: nginx
+    host: keycloak.example.com
+    tls:
+      enabled: true
+      secretName: keycloak-tls
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+      nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
+
+bundleStorage:
+  size: 100Gi
+  # ReadWriteMany enables multiple backend replicas to share uploads.
+  accessMode: ReadWriteMany
+  storageClassName: ""       # set to an RWX class (nfs, azurefile, filestore, …)
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-body-size: "500m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+  hosts:
+    - host: supportplane.example.com
+      paths:
+        - path: /api
+          pathType: Prefix
+          backend: backend
+        - path: /
+          pathType: Prefix
+          backend: frontend
+  tls:
+    - hosts:
+        - supportplane.example.com
+      secretName: supportplane-tls
+
+networkPolicy:
+  enabled: true

@@ -2,7 +2,7 @@ import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-import { Server, Package, FileText, Copy, Check, Shield, ClipboardList } from 'lucide-react'
+import { Server, Package, FileText, Copy, Check, Shield, ClipboardList, Brain } from 'lucide-react'
 import { useState } from 'react'
 
 export default function ClusterDetailPage() {
@@ -68,6 +68,10 @@ export default function ClusterDetailPage() {
           <Link to={`/clusters/${id}/audit-report`}
             className="flex items-center gap-2 px-3 py-1.5 text-sm border rounded-md hover:bg-gray-50">
             <ClipboardList className="w-4 h-4" /> Audit Report
+          </Link>
+          <Link to={`/clusters/${id}/ai-insights`}
+            className="flex items-center gap-2 px-3 py-1.5 text-sm border border-purple-200 text-purple-700 rounded-md hover:bg-purple-50">
+            <Brain className="w-4 h-4" /> AI Insights
           </Link>
         </div>
       </div>

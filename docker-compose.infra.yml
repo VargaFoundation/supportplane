@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    container_name: supportplane-clickhouse
+    ports:
+      - "8123:8123"   # HTTP interface
+      - "9000:9000"   # Native TCP
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./infra/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      CLICKHOUSE_DB: supportplane
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-supportplane}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:?CLICKHOUSE_PASSWORD must be set in .env}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: supportplane-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki-data:/loki
+      - ./infra/loki/config.yml:/etc/loki/local-config.yaml
+    command: -config.file=/etc/loki/local-config.yaml
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: supportplane-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+    volumes:
+      - grafana-data:/var/lib/grafana
+
+  # One-shot bootstrap: generates the self-signed CA + broker cert, the RS256
+  # JWT keypair, and the superuser token consumed by the SupportPlane backend.
+  # Idempotent — exits immediately if the material already exists on the
+  # shared volumes. See infra/pulsar/init/init.sh.
+  pulsar-init:
+    image: apachepulsar/pulsar:3.2.2
+    container_name: supportplane-pulsar-init
+    entrypoint: ["/bin/bash", "/init/init.sh"]
+    volumes:
+      - ./infra/pulsar/init:/init:ro
+      - pulsar-keys:/pulsar/keys
+      - pulsar-certs:/pulsar/certs
+    restart: "no"
+
+  # Apache Pulsar in standalone mode — bundles ZK + BookKeeper + Broker in
+  # one process. For production, switch to the apache/pulsar-helm-chart
+  # (broker + proxy + bookie + zk separated) — see ADR 0003. Auth + TLS
+  # config keys are identical between standalone and the production chart.
+  pulsar:
+    image: apachepulsar/pulsar:3.2.2
+    container_name: supportplane-pulsar
+    depends_on:
+      pulsar-init:
+        condition: service_completed_successfully
+    command: >
+      bash -c "cat /pulsar-overrides/standalone.conf >> /pulsar/conf/standalone.conf &&
+               exec bin/pulsar standalone --no-functions-worker --no-stream-storage"
+    ports:
+      - "6650:6650"   # Binary protocol — plaintext (dev only, fence in prod)
+      - "6651:6651"   # Binary protocol — TLS (production-facing)
+      - "8082:8080"   # Admin REST — plaintext (dev only)
+      - "8443:8443"   # Admin REST — TLS
+    environment:
+      PULSAR_MEM: "-Xms512m -Xmx1g -XX:MaxDirectMemorySize=1g"
+    volumes:
+      - pulsar-data:/pulsar/data
+      - pulsar-keys:/pulsar/keys:ro
+      - pulsar-certs:/pulsar/certs:ro
+      - ./infra/pulsar/conf:/pulsar-overrides:ro
+    healthcheck:
+      test: ["CMD", "bin/pulsar-admin", "brokers", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  clickhouse-data:
+  loki-data:
+  grafana-data:
+  pulsar-data:
+  pulsar-keys:
+  pulsar-certs:

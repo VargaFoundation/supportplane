@@ -5,8 +5,35 @@ metadata:
   labels:
     {{- include "supportplane.labels" . | nindent 4 }}
 data:
-  SPRING_DATASOURCE_URL: jdbc:postgresql://{{ include "supportplane.fullname" . }}-postgres:5432/{{ .Values.secrets.postgres.database }}
-  KEYCLOAK_AUTH_SERVER_URL: http://{{ include "supportplane.fullname" . }}-keycloak:8080
-  KEYCLOAK_CLIENTS_REALM: clients
-  KEYCLOAK_SUPPORT_REALM: support
   SERVER_PORT: "8081"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://{{ include "supportplane.postgresHost" . }}:{{ include "supportplane.postgresPort" . }}/{{ .Values.secrets.postgres.database }}"
+  KEYCLOAK_AUTH_SERVER_URL: {{ include "supportplane.keycloakInternalUrl" . | quote }}
+  KEYCLOAK_CLIENTS_REALM: {{ .Values.keycloak.realms.clients | quote }}
+  KEYCLOAK_SUPPORT_REALM: {{ .Values.keycloak.realms.support | quote }}
+  {{- if .Values.backend.corsAllowedOrigins }}
+  CORS_ALLOWED_ORIGINS: {{ .Values.backend.corsAllowedOrigins | quote }}
+  {{- end }}
+
+  # ---------- Observability wiring (optional) ----------
+  {{- if .Values.clickhouse.enabled }}
+  CLICKHOUSE_ENABLED: "true"
+  CLICKHOUSE_URL: "jdbc:ch://{{ .Release.Name }}-clickhouse:8123/supportplane"
+  {{- else }}
+  CLICKHOUSE_ENABLED: "false"
+  {{- end }}
+
+  {{- if .Values.loki.enabled }}
+  LOKI_ENABLED: "true"
+  LOKI_URL: "http://{{ .Release.Name }}-loki:3100"
+  {{- else }}
+  LOKI_ENABLED: "false"
+  {{- end }}
+
+  {{- if .Values.pulsar.enabled }}
+  PULSAR_ENABLED: "true"
+  PULSAR_SERVICE_URL: "pulsar://{{ .Release.Name }}-pulsar-broker:6650"
+  PULSAR_TENANT: {{ .Values.pulsar.tenant | quote }}
+  PULSAR_DEFAULT_NAMESPACE: {{ .Values.pulsar.defaultNamespace | quote }}
+  {{- else }}
+  PULSAR_ENABLED: "false"
+  {{- end }}

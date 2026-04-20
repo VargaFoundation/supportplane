@@ -1,0 +1,15 @@
+# Patterns to ignore when building the chart archive.
+.DS_Store
+.git/
+.gitignore
+.vscode/
+.idea/
+*.tmproj
+*.bak
+*.swp
+*.orig
+*.tmp
+# Helm dependency cache lives here but we ship it pinned — keep charts/
+# in the archive by default. Uncomment the next line if you prefer users to
+# run `helm dependency update` themselves.
+# charts/

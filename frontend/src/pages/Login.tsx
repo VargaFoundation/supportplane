@@ -21,7 +21,7 @@ export default function Login() {
 
     try {
       const { data } = await api.post('/auth/login', { username, password, tenantId })
-      login(data.accessToken, data.refreshToken, tenantId)
+      login(data.accessToken, data.refreshToken, tenantId, data.role)
       navigate('/')
     } catch {
       setError('Authentication failed. Check your credentials and tenant ID.')

@@ -1,0 +1,11 @@
+{{- if and .Values.keycloak.enabled .Values.keycloak.importRealms }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "supportplane.fullname" . }}-keycloak-realms
+  labels:
+    {{- include "supportplane.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+data:
+{{ (.Files.Glob "realms/*.json").AsConfig | indent 2 }}
+{{- end }}

@@ -8,6 +8,8 @@ metadata:
     app.kubernetes.io/component: keycloak
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       {{- include "supportplane.selectorLabels" . | nindent 6 }}
@@ -18,52 +20,104 @@ spec:
         {{- include "supportplane.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: keycloak
     spec:
+      serviceAccountName: {{ include "supportplane.serviceAccountName" . }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: keycloak
           image: "{{ .Values.keycloak.image.repository }}:{{ .Values.keycloak.image.tag }}"
+          imagePullPolicy: {{ .Values.keycloak.image.pullPolicy }}
           args:
+            {{- if eq .Values.keycloak.mode "dev" }}
             - start-dev
+            {{- else }}
+            - start
+            - --optimized
+            - --proxy=edge
+            - --hostname-strict=false
+            {{- if .Values.keycloak.hostname }}
+            - --hostname={{ .Values.keycloak.hostname }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.keycloak.importRealms }}
             - --import-realm
+            {{- end }}
+            {{- with .Values.keycloak.extraArgs }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
           ports:
-            - containerPort: 8080
+            - name: http
+              containerPort: 8080
               protocol: TCP
           env:
             - name: KC_DB
               value: postgres
             - name: KC_DB_URL
-              value: jdbc:postgresql://{{ include "supportplane.fullname" . }}-postgres:5432/{{ .Values.secrets.postgres.database }}
+              value: "jdbc:postgresql://{{ include "supportplane.postgresHost" . }}:{{ include "supportplane.postgresPort" . }}/{{ .Values.secrets.postgres.database }}"
             - name: KC_DB_USERNAME
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: POSTGRES_USER
             - name: KC_DB_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: POSTGRES_PASSWORD
             - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: KEYCLOAK_ADMIN
             - name: KEYCLOAK_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: {{ include "supportplane.fullname" . }}-secrets
+                  name: {{ include "supportplane.secretName" . }}
                   key: KEYCLOAK_ADMIN_PASSWORD
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_METRICS_ENABLED
+              value: "true"
+            - name: KC_HTTP_ENABLED
+              value: "true"
           livenessProbe:
             httpGet:
-              path: /health/ready
-              port: 8080
-            initialDelaySeconds: 60
-            periodSeconds: 15
+              path: /health/live
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 20
+            failureThreshold: 5
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: 8080
-            initialDelaySeconds: 30
+              port: http
+            initialDelaySeconds: 60
             periodSeconds: 10
+            failureThreshold: 10
           resources:
             {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.keycloak.importRealms }}
+            - name: realms
+              mountPath: /opt/keycloak/data/import
+              readOnly: true
+            {{- end }}
+            {{- if .Values.keycloak.mountCustomTheme }}
+            - name: custom-theme
+              mountPath: /opt/keycloak/themes/supportplane
+              readOnly: true
+            {{- end }}
+      volumes:
+        {{- if .Values.keycloak.importRealms }}
+        - name: realms
+          configMap:
+            name: {{ include "supportplane.fullname" . }}-keycloak-realms
+        {{- end }}
+        {{- if .Values.keycloak.mountCustomTheme }}
+        - name: custom-theme
+          configMap:
+            name: {{ include "supportplane.fullname" . }}-keycloak-theme
+        {{- end }}
 {{- end }}
